@@ -30,9 +30,25 @@ SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY", "")
 APP_BASE_URL = os.getenv("APP_BASE_URL", "http://localhost:8000")
 
 # LLM / orchestrator config
-ICA_API_KEY = os.getenv("ICA_API_KEY", "")
-ICA_BASE_URL = os.getenv("ICA_BASE_URL", "")
-ICA_MODEL = os.getenv("ICA_MODEL", "gpt-4o")
+ICA_API_KEY = os.getenv("ICA_API_KEY", "").strip()
+ICA_MODEL = os.getenv("ICA_MODEL", "gpt-5.4").strip()
+
+
+def _normalize_base_url(raw: str) -> str:
+    """Normalize the ICA base URL for the OpenAI-compatible client.
+
+    Strips whitespace/trailing slashes and ensures the OpenAI client's
+    required `/v1` suffix is present (the IBM endpoint 404s without it).
+    """
+    url = (raw or "").strip().rstrip("/")
+    if not url:
+        return ""
+    if not url.endswith("/v1"):
+        url = url + "/v1"
+    return url
+
+
+ICA_BASE_URL = _normalize_base_url(os.getenv("ICA_BASE_URL", ""))
 
 
 def data_file(name: str) -> Path:

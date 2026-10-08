@@ -18,11 +18,12 @@ and every response passes through the output filter before leaving the server.
 from __future__ import annotations
 
 import re
+from datetime import date, datetime
 from typing import Any, Callable
 
 from . import config, filters
 from .state import SessionState, get_session
-from .tool_logger import call_tool
+from .tool_logger import call_tool, log_intent, log_llm_call
 from .tools import actions, hr, policy_rag
 from .tools import team_project as tp
 
@@ -46,7 +47,119 @@ TOOLS: dict[str, Callable[..., Any]] = {
 }
 
 _CONFIRM_WORDS = re.compile(r"\b(yes|confirm|proceed|go ahead|do it|book it|sounds good)\b", re.I)
-_DATE = re.compile(r"(\d{4}-\d{2}-\d{2})")
+
+# Default leave year used when the user omits the year (demo data is 2026).
+_DEFAULT_YEAR = 2026
+
+_MONTHS = {
+    "jan": 1, "january": 1, "feb": 2, "february": 2, "mar": 3, "march": 3,
+    "apr": 4, "april": 4, "may": 5, "jun": 6, "june": 6, "jul": 7, "july": 7,
+    "aug": 8, "august": 8, "sep": 9, "sept": 9, "september": 9, "oct": 10,
+    "october": 10, "nov": 11, "november": 11, "dec": 12, "december": 12,
+}
+
+# ISO:               2026-10-12
+_ISO = re.compile(r"\b(\d{4})-(\d{1,2})-(\d{1,2})\b")
+# Day Month [Year]:  10 Oct 2026 | 10 October | 10th Oct
+_DMY = re.compile(
+    r"\b(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3,9})(?:\s+(\d{4}))?\b", re.I
+)
+# Month Day [Year]:  Oct 10 2026 | October 10, 2026
+_MDY = re.compile(
+    r"\b([A-Za-z]{3,9})\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?\b", re.I
+)
+# Numeric slash:     12/10/2026 | 12-10-2026  (day/month/year, SG convention)
+_SLASH = re.compile(r"\b(\d{1,2})[/](\d{1,2})[/](\d{2,4})\b")
+# Shared-month range: '20 to 27 Oct 2026' | '20-27 October' (first day borrows
+# the month/year from the second).
+_RANGE_SHARED_MONTH = re.compile(
+    r"\b(\d{1,2})(?:st|nd|rd|th)?\s*(?:-|–|to|until|till|through|thru)\s*"
+    r"(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3,9})(?:\s+(\d{4}))?\b",
+    re.I,
+)
+
+
+def _safe_date(y: int, m: int, d: int) -> date | None:
+    try:
+        return date(y, m, d)
+    except ValueError:
+        return None
+
+
+def parse_dates(message: str) -> list[str]:
+    """Extract dates from free text, returned as ISO strings in reading order.
+
+    Handles ISO (2026-10-12), '10 Oct 2026', 'October 10', '12/10/2026', and
+    bare day-month without a year (assumes the demo leave year). Deduplicates
+    while preserving order.
+    """
+    found: list[tuple[int, str]] = []  # (position, iso)
+    consumed: list[tuple[int, int]] = []  # char spans already matched as a range
+
+    def _overlaps_consumed(start: int, end: int) -> bool:
+        return any(start < ce and cs < end for cs, ce in consumed)
+
+    # Shared-month ranges first (so '20 to 27 Oct' isn't read as just '27 Oct').
+    for m in _RANGE_SHARED_MONTH.finditer(message):
+        mon = _MONTHS.get(m.group(3).lower())
+        if not mon:
+            continue
+        year = int(m.group(4)) if m.group(4) else _DEFAULT_YEAR
+        d1 = _safe_date(year, mon, int(m.group(1)))
+        d2 = _safe_date(year, mon, int(m.group(2)))
+        if d1 and d2:
+            found.append((m.start(), d1.isoformat()))
+            found.append((m.start() + 1, d2.isoformat()))
+            consumed.append((m.start(), m.end()))
+
+    for m in _ISO.finditer(message):
+        if _overlaps_consumed(m.start(), m.end()):
+            continue
+        d = _safe_date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        if d:
+            found.append((m.start(), d.isoformat()))
+
+    for m in _DMY.finditer(message):
+        if _overlaps_consumed(m.start(), m.end()):
+            continue
+        mon = _MONTHS.get(m.group(2).lower())
+        if not mon:
+            continue
+        year = int(m.group(3)) if m.group(3) else _DEFAULT_YEAR
+        d = _safe_date(year, mon, int(m.group(1)))
+        if d:
+            found.append((m.start(), d.isoformat()))
+
+    for m in _MDY.finditer(message):
+        if _overlaps_consumed(m.start(), m.end()):
+            continue
+        mon = _MONTHS.get(m.group(1).lower())
+        if not mon:
+            continue
+        year = int(m.group(3)) if m.group(3) else _DEFAULT_YEAR
+        d = _safe_date(year, mon, int(m.group(2)))
+        if d:
+            found.append((m.start(), d.isoformat()))
+
+    for m in _SLASH.finditer(message):
+        if _overlaps_consumed(m.start(), m.end()):
+            continue
+        day, mon, yr = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        if yr < 100:
+            yr += 2000
+        d = _safe_date(yr, mon, day)
+        if d:
+            found.append((m.start(), d.isoformat()))
+
+    # Order by position in the sentence, dedupe preserving first occurrence.
+    found.sort(key=lambda t: t[0])
+    seen: set[str] = set()
+    out: list[str] = []
+    for _, iso in found:
+        if iso not in seen:
+            seen.add(iso)
+            out.append(iso)
+    return out
 
 
 def _run_tool(name: str, label: str, status: str = "working", **kwargs) -> Any:
@@ -68,6 +181,8 @@ def handle_message(message: str) -> dict[str, Any]:
     activity events; the output filter runs on either result.
     """
     session = get_session()
+    mode = "llm" if _llm_enabled() else "deterministic"
+    log_intent("user_message", {"mode": mode, "message": message})
     if _llm_enabled():
         reply = _route_llm(message, session)
     else:
@@ -155,19 +270,51 @@ def _route_llm(message: str, session: SessionState) -> str:  # pragma: no cover 
         return _route(message, session)
 
     client = OpenAI(api_key=config.ICA_API_KEY, base_url=config.ICA_BASE_URL)
-    messages: list[dict[str, Any]] = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": message},
-    ]
     import json as _json
+    import time as _time
 
+    # Persistent conversation history gives the agent memory across turns.
+    # Seed the system prompt once, then carry prior turns forward.
+    if not session.conversation:
+        session.conversation = [{"role": "system", "content": SYSTEM_PROMPT}]
+    messages = session.conversation
+    messages.append({"role": "user", "content": message})
+
+    final_reply = "I wasn't able to complete that — please try rephrasing."
     for _ in range(8):  # bounded tool-call loop
-        resp = client.chat.completions.create(
-            model=config.ICA_MODEL, messages=messages, tools=_tool_schema(),
-        )
+        started = _time.perf_counter()
+        try:
+            resp = client.chat.completions.create(
+                model=config.ICA_MODEL, messages=messages, tools=_tool_schema(),
+            )
+        except Exception as exc:
+            dur = round((_time.perf_counter() - started) * 1000, 1)
+            log_llm_call(config.ICA_MODEL, messages, {}, dur, error=repr(exc))
+            # Drop the dangling user turn so a retry starts clean.
+            if messages and messages[-1].get("role") == "user":
+                messages.pop()
+            return "I had trouble reaching the model just now — please try again."
+
+        dur = round((_time.perf_counter() - started) * 1000, 1)
         choice = resp.choices[0].message
+        tool_calls = [
+            {"name": tc.function.name, "args": tc.function.arguments}
+            for tc in (choice.tool_calls or [])
+        ]
+        usage = getattr(resp, "usage", None)
+        # Log the full LLM round-trip: request messages + raw response summary.
+        log_llm_call(config.ICA_MODEL, messages, {
+            "content": choice.content or "",
+            "tool_calls": tool_calls,
+            "finish_reason": resp.choices[0].finish_reason,
+            "usage": usage.model_dump() if usage is not None else None,
+        }, dur)
+        # Also log the distilled intent (reasoning + chosen tools).
+        log_intent("llm_reasoning", {"content": choice.content or "", "tool_calls": tool_calls})
         if not choice.tool_calls:
-            return choice.content or ""
+            final_reply = choice.content or ""
+            messages.append({"role": "assistant", "content": final_reply})
+            break
         messages.append({"role": "assistant", "content": choice.content,
                          "tool_calls": [tc.model_dump() for tc in choice.tool_calls]})
         for tc in choice.tool_calls:
@@ -183,7 +330,25 @@ def _route_llm(message: str, session: SessionState) -> str:  # pragma: no cover 
                 email_service.send_approval_email(result["employee_time_id"])
             messages.append({"role": "tool", "tool_call_id": tc.id,
                              "content": _json.dumps(result, default=str)})
-    return "I wasn't able to complete that — please try rephrasing."
+
+    _trim_conversation(session)
+    return final_reply
+
+
+# Keep the system prompt + the most recent N messages so history stays bounded.
+_MAX_HISTORY = 40
+
+
+def _trim_conversation(session: SessionState) -> None:
+    conv = session.conversation
+    if len(conv) <= _MAX_HISTORY + 1:
+        return
+    system = conv[0:1] if conv and conv[0].get("role") == "system" else []
+    tail = conv[-_MAX_HISTORY:]
+    # Avoid starting the tail on an orphaned 'tool' message (needs its assistant).
+    while tail and tail[0].get("role") == "tool":
+        tail = tail[1:]
+    session.conversation = system + tail
 
 
 # ---------------------------------------------------------------------------
@@ -195,29 +360,49 @@ def _route(message: str, session: SessionState) -> str:
 
     # 1) Confirmation of a pending recommendation.
     if _CONFIRM_WORDS.search(text) and session.recommended_dates and not session.employee_confirmed:
+        log_intent("planner_intent", {"intent": "confirm_submit",
+                                      "recommended_dates": session.recommended_dates,
+                                      "leave_type": session.recommended_leave_type})
         return _confirm_and_submit(session)
 
     # 2) Status lookup: "what's the status of R019?"
     m = re.search(r"\b(r\d{3,})\b", text)
     if "status" in text and m:
+        log_intent("planner_intent", {"intent": "status_lookup", "reference_id": m.group(1).upper()})
         return _status_lookup(m.group(1).upper())
 
     # 3) Policy question (grounded in the company policy document).
     if any(w in text for w in ("policy", "entitled to", "how many days do i get",
                                "how much", "rules on", "allowed", "carry over",
                                "carry-over", "expire")):
+        log_intent("planner_intent", {"intent": "policy_question"})
         return _policy_reply(message)
 
     # 4) Balance query (the user's own live numbers).
     if any(w in text for w in ("balance", "how many days do i have", "my entitlement",
                                "leave do i have", "days left", "days remaining")):
+        log_intent("planner_intent", {"intent": "balance_query"})
         return _balance_reply(session)
 
-    # 5) Leave request.
-    if any(w in text for w in ("leave", "day off", "days off", "time off", "holiday", "childcare")):
+    # 5) Leave request. Trigger on an explicit keyword, OR when the message
+    #    contains dates, OR as a follow-up to an in-progress request (the user
+    #    proposing different dates, e.g. "what about 20 to 27 Oct").
+    parsed = parse_dates(message)
+    has_dates = bool(parsed)
+    in_progress = session.requested_dates is not None and not session.employee_confirmed
+    if (any(w in text for w in ("leave", "day off", "days off", "time off", "holiday", "childcare"))
+            or has_dates or in_progress):
+        log_intent("planner_intent", {
+            "intent": "leave_request",
+            "parsed_dates": parsed,
+            "has_keyword": any(w in text for w in ("leave", "day off", "days off",
+                                                   "time off", "holiday", "childcare")),
+            "followup_in_progress": in_progress,
+        })
         return _leave_request_reply(message, session)
 
     # Default.
+    log_intent("planner_intent", {"intent": "fallback_help"})
     return (
         "I can help you check your leave balance, plan time off around your team "
         "and project schedule, or check the status of a request. What would you like to do?"
@@ -251,21 +436,32 @@ def _policy_reply(message: str) -> str:
 def _leave_request_reply(message: str, session: SessionState) -> str:
     profile = _run_tool("get_employee_profile", "Retrieving employee profile")
 
-    # Determine leave type (childcare -> CL, else AL).
-    leave_type = "CL" if "childcare" in message.lower() else "AL"
+    # Determine leave type. 'childcare' in the message forces CL; otherwise
+    # keep the leave type from the in-progress request (a follow-up proposing
+    # new dates shouldn't silently drop CL back to AL); default to AL.
+    if "childcare" in message.lower():
+        leave_type = "CL"
+    elif session.requested_leave_type and not session.employee_confirmed:
+        leave_type = session.requested_leave_type
+    else:
+        leave_type = "AL"
     if leave_type == "CL":
         elig = _run_tool("check_childcare_eligibility", "Checking childcare eligibility", status="ok")
         if not elig["eligible"]:
             leave_type = "AL"
 
-    # Dates from the message, default to the demo window 27-28 Oct.
-    dates = _DATE.findall(message)
+    # Dates from the message (natural language or ISO).
+    dates = parse_dates(message)
     if len(dates) >= 2:
         start, end = dates[0], dates[1]
     elif len(dates) == 1:
         start = end = dates[0]
     else:
-        start, end = "2026-10-27", "2026-10-28"
+        # No date given — ask rather than guessing a window.
+        return (
+            "Sure — which dates were you thinking of? For example "
+            "'10 Oct to 12 Oct' or '2026-11-10 to 2026-11-11'."
+        )
 
     session.user_goal = message
     session.requested_leave_type = leave_type

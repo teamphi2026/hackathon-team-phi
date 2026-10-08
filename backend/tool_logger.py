@@ -60,6 +60,54 @@ def _write_record(record: dict[str, Any]) -> None:
         logger.warning("failed to write tool-call log: %s", exc)
 
 
+def log_intent(kind: str, detail: dict[str, Any]) -> None:
+    """Log a planner/LLM intent decision (not a tool call).
+
+    `kind` is a short label such as 'user_message', 'planner_intent',
+    'llm_reasoning', or 'llm_tool_calls'. `detail` is a JSON-able dict.
+    """
+    user = get_session().session_user_id
+    record = {
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "user": user,
+        "intent": kind,
+        "detail": detail,
+    }
+    logger.info("◆ intent[%s] %s", kind, _safe(detail))
+    _write_record(record)
+
+
+def log_llm_call(
+    model: str,
+    messages: list[dict[str, Any]],
+    response: dict[str, Any],
+    duration_ms: float,
+    *,
+    error: str | None = None,
+) -> None:
+    """Log one raw LLM round-trip: request (model + messages) and response.
+
+    `messages` is the full chat history sent; `response` is a compact dict
+    (content, tool calls, finish reason, usage). Previews are truncated.
+    """
+    user = get_session().session_user_id
+    record = {
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "user": user,
+        "llm_call": model,
+        "request_messages": _safe(messages),
+        "response": response if error is None else None,
+        "error": error,
+        "duration_ms": duration_ms,
+    }
+    if error is None:
+        logger.info("◆ llm %s in %sms (usage=%s, finish=%s)", model, duration_ms,
+                    response.get("usage"), response.get("finish_reason"))
+    else:
+        logger.error("◆ llm %s FAILED in %sms: %s", model, duration_ms, error)
+    _write_record(record)
+
+
 def call_tool(name: str, func: Callable[..., Any], **kwargs: Any) -> Any:
     """Invoke a tool with structured logging. Returns the tool's result.
 

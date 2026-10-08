@@ -206,6 +206,9 @@ def get_entitlements() -> dict[str, Any]:
     tat = _load("06_Time_Account_Type.csv")
     type_name = dict(zip(tat.time_account_type_code, tat.time_account_type_name))
 
+    # Account type -> bookable leave_type code (the value submit_leave_request wants).
+    acc_to_leave = {v: k for k, v in _LEAVE_TO_ACCOUNT.items()}
+
     accounts: list[dict[str, Any]] = []
     rows = ta[(ta.user_id == uid) & (ta.account_closed != "Y")]
     for _, r in rows.iterrows():
@@ -214,6 +217,8 @@ def get_entitlements() -> dict[str, Any]:
         entry: dict[str, Any] = {
             "time_account_id": r["time_account_id"],
             "account_type": acc_type,
+            # Bookable leave-type code (e.g. "AL") so the agent maps names to codes.
+            "leave_type": acc_to_leave.get(acc_type, acc_type),
             "account_name": type_name.get(acc_type, acc_type),
             "balance_today": _to_num(r["balance_today"]) or 0.0,
             "pending_requests": _to_num(r["pending_requests"]) or 0.0,

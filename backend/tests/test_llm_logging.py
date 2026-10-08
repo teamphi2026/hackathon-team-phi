@@ -140,7 +140,8 @@ def test_conversation_memory_persists_across_turns(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "ICA_API_KEY", "test-key")
     monkeypatch.setattr(config, "ICA_BASE_URL", "https://example.test")
     import openai
-    monkeypatch.setattr(openai, "OpenAI", lambda **kw: _FakeClient(scripted))
+    fake = _FakeClient(scripted)  # shared so the counter advances across turns
+    monkeypatch.setattr(openai, "OpenAI", lambda **kw: fake)
 
     s = get_session()
     agent.handle_message("I want leave in mid-November")
@@ -153,6 +154,40 @@ def test_conversation_memory_persists_across_turns(tmp_path, monkeypatch):
     assert roles == ["system", "user", "assistant", "user", "assistant"]
     # The first user message is still present — the agent has memory of it.
     assert any(m["role"] == "user" and "mid-November" in m["content"] for m in s.conversation)
+
+
+def test_llm_apply_flow_submits_after_confirmation(tmp_path, monkeypatch):
+    """End-to-end apply via the LLM: assess, then submit on confirmation."""
+    # Turn 1: model assesses with a tool call, then answers (asks to confirm).
+    # Turn 2 (after user 'yes'): model calls submit_leave_request, then answers.
+    scripted = [
+        _Resp(_Msg(content=None,
+                   tool_calls=[_ToolCall("validate_policy",
+                       '{"leave_type":"AL","start_date":"2026-11-17","end_date":"2026-11-18"}')]),
+              "tool_calls"),
+        _Resp(_Msg(content="AL on Nov 17-18 is clear. Confirm to book?", tool_calls=None), "stop"),
+        _Resp(_Msg(content=None,
+                   tool_calls=[_ToolCall("submit_leave_request",
+                       '{"leave_type":"AL","start_date":"2026-11-17","end_date":"2026-11-18","reason":"personal"}')]),
+              "tool_calls"),
+        _Resp(_Msg(content="Done — submitted and your manager was emailed.", tool_calls=None), "stop"),
+    ]
+    monkeypatch.setattr(config, "ICA_API_KEY", "test-key")
+    monkeypatch.setattr(config, "ICA_BASE_URL", "https://example.test")
+    assert agent._llm_enabled()  # ensure we exercise the LLM path, not the planner
+    import openai
+    # Return the SAME fake client each turn so the scripted response counter
+    # advances across both handle_message calls (OpenAI() is called per turn).
+    fake = _FakeClient(scripted)
+    monkeypatch.setattr(openai, "OpenAI", lambda **kw: fake)
+
+    s = get_session()
+    agent.handle_message("I'd like annual leave Nov 17-18")
+    assert s.reference_id is None  # not submitted yet — only assessed
+    out = agent.handle_message("yes, confirm")
+    assert "submitted" in out["reply"].lower() or "done" in out["reply"].lower()
+    assert s.reference_id is not None  # a request row was written
+    assert s.approval_status == "PENDING_MANAGER_APPROVAL"
 
 
 def test_reset_clears_conversation(tmp_path, monkeypatch):

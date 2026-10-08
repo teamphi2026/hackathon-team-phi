@@ -1,25 +1,30 @@
 # HR Orchestrator AI Agent — workbook index
 
-Converted from `HR Orchestrator AI Agent.xlsx`. Each sheet is exported as a UTF-8 CSV in this folder (first row = column headers). Small reference sheets are also inlined below.
+Sheets 1–16 are converted from `HR Orchestrator AI Agent.xlsx`. Each sheet is exported as a UTF-8 CSV in this folder (first row = column headers). Files 17–21 are not in the workbook; they were added for the orchestrator backend (childcare leave, project-aware planning, multi-company policies and login). Small reference sheets are also inlined below.
 
 | # | Sheet | File | Data rows | Columns |
 |---|---|---|---|---|
 | 1 | SF_Mapping | [01_SF_Mapping.csv](01_SF_Mapping.csv) | 22 | tab, match_level, sf_equivalent, whats_the_same, whats_different_or_extra, sf_field_names_used, source |
-| 2 | Job_Information | [02_Job_Information.csv](02_Job_Information.csv) | 15 | user_id, full_name, email, home_team_id, job_title, manager_id, join_date, years_of_service, employment_status, annual_leave_entitlement, all_teams, team_count, time_profile_code, work_schedule_code, holiday_calendar_code |
+| 2 | Job_Information | [02_Job_Information.csv](02_Job_Information.csv) | 15 | user_id, full_name, email, home_team_id, job_title, manager_id, join_date, years_of_service, employment_status, annual_leave_entitlement, all_teams, team_count, time_profile_code, work_schedule_code, holiday_calendar_code, project_id |
 | 3 | Teams | [03_Teams.csv](03_Teams.csv) | 5 | team_id, team_name, head_employee_id, headcount, min_staff_on_duty, notes |
 | 4 | Team_Members | [04_Team_Members.csv](04_Team_Members.csv) | 18 | membership_id, user_id, team_id, is_primary, role_in_team |
-| 5 | Time_Type | [05_Time_Type.csv](05_Time_Type.csv) | 4 | time_type_code, time_type_name, time_unit, time_account_type_code, requires_approval, requires_medical_cert, duration_display, notes |
-| 6 | Time_Account_Type | [06_Time_Account_Type.csv](06_Time_Account_Type.csv) | 4 | time_account_type_code, time_account_type_name, account_creation_type, entitlement_method, accrual_rule_code, annual_quota_days, account_valid_from, account_valid_until, carry_over_allowed, expiry_rule, notes |
+| 5 | Time_Type | [05_Time_Type.csv](05_Time_Type.csv) | 5 | time_type_code, time_type_name, time_unit, time_account_type_code, requires_approval, requires_medical_cert, duration_display, notes |
+| 6 | Time_Account_Type | [06_Time_Account_Type.csv](06_Time_Account_Type.csv) | 5 | time_account_type_code, time_account_type_name, account_creation_type, entitlement_method, accrual_rule_code, annual_quota_days, account_valid_from, account_valid_until, carry_over_allowed, expiry_rule, notes |
 | 7 | Accrual_Rule | [07_Accrual_Rule.csv](07_Accrual_Rule.csv) | 5 | accrual_rule_code, tier_id, min_years_service, max_years_service, annual_days, posting_frequency, first_posting_rule, description |
-| 8 | Time_Profile | [08_Time_Profile.csv](08_Time_Profile.csv) | 6 | time_profile_code, time_type_code, available_to_employee, favorite, main_absence_time_type |
+| 8 | Time_Profile | [08_Time_Profile.csv](08_Time_Profile.csv) | 7 | time_profile_code, time_type_code, available_to_employee, favorite, main_absence_time_type |
 | 9 | Work_Schedule | [09_Work_Schedule.csv](09_Work_Schedule.csv) | 2 | work_schedule_code, work_schedule_name, mon_hours, tue_hours, wed_hours, thu_hours, fri_hours, sat_hours, sun_hours, weekend_mask |
 | 10 | Holiday_Calendar | [10_Holiday_Calendar.csv](10_Holiday_Calendar.csv) | 26 | date, holiday_name, day_of_week, is_in_lieu, notes, holiday_calendar_code |
-| 11 | Time_Account | [11_Time_Account.csv](11_Time_Account.csv) | 60 | time_account_id, user_id, time_account_type_code, account_valid_from, account_valid_until, account_closed, balance_today, planned_bookings, pending_requests, available, projected_year_end |
+| 11 | Time_Account | [11_Time_Account.csv](11_Time_Account.csv) | 61 | time_account_id, user_id, time_account_type_code, account_valid_from, account_valid_until, account_closed, balance_today, planned_bookings, pending_requests, available, projected_year_end |
 | 12 | Time_Account_Detail | [12_Time_Account_Detail.csv](12_Time_Account_Detail.csv) | 199 | detail_id, time_account_id, booking_date, posting_type, booking_amount, booking_unit, employee_time_id, comment, expiry_date, consumes_detail_id, remaining_credit, credit_status |
 | 13 | Employee_Time | [13_Employee_Time.csv](13_Employee_Time.csv) | 18 | employee_time_id, user_id, time_type_code, start_date, end_date, half_day, quantity_in_days, reason, approval_status, approver_id, submitted_at, decided_at, decision_note |
 | 14 | Day_Calculator | [14_Day_Calculator.csv](14_Day_Calculator.csv) | 6 | field, value, notes |
 | 15 | Leave_Calendar | [15_Leave_Calendar.csv](15_Leave_Calendar.csv) | 38 | Month (type any date in it):, 2026-10-01, , , , , , , team, short_days, at_min_days, verdict |
 | 16 | Agent_Guide | [16_Agent_Guide.csv](16_Agent_Guide.csv) | 30 | item_type, name, description, reads, writes, logic |
+| 17 | Dependents | [17_Dependents.csv](17_Dependents.csv) | 1 | dependent_id, user_id, name, date_of_birth, relationship |
+| 18 | Entitlement_Rules | [18_Entitlement_Rules.csv](18_Entitlement_Rules.csv) | 2 | rule_id, time_type_code, condition_field, condition_operator, condition_value, annual_quota_days, notes |
+| 19 | Project_Events | [19_Project_Events.csv](19_Project_Events.csv) | 2 | event_id, project_id, event_type, start_date, end_date, description |
+| 20 | Companies | [20_Companies.csv](20_Companies.csv) | 2 | company_id, company_name, contract_hr_email, time_profile_code, policy_file |
+| 21 | Users | [21_Users.csv](21_Users.csv) | 3 | username, salt, password_hash, user_id, display_name |
 
 ## SF_Mapping
 
@@ -54,23 +59,23 @@ File: `01_SF_Mapping.csv`
 
 File: `02_Job_Information.csv`
 
-| user_id | full_name | email | home_team_id | job_title | manager_id | join_date | years_of_service | employment_status | annual_leave_entitlement | all_teams | team_count | time_profile_code | work_schedule_code | holiday_calendar_code |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| E001 | Priya Nair | priya.nair@i-be-yam.com | T01 | Managing Director |  | 2015-03-02 | 11 | Active | 21 | Man Age Men-T | 1 | SG_STD | SG_STD | SG |
-| E002 | Daniel Tan | daniel.tan@i-be-yam.com | T05 | HR Manager | E001 | 2017-06-12 | 9 | Active | 21 | Meow Woof Arf | 1 | SG_STD | SG_STD | SG |
-| E003 | Aisha Rahman | aisha.rahman@i-be-yam.com | T05 | HR Executive | E002 | 2023-02-01 | 3 | Active | 15 | Meow Woof Arf | 1 | SG_STD | SG_STD | SG |
-| E004 | Marcus Lim | marcus.lim@i-be-yam.com | T02 | Engineering Manager | E001 | 2018-09-03 | 8 | Active | 21 | Empty'em | 1 | SG_STD | SG_STD | SG |
-| E005 | Wei Ling Chua | weiling.chua@i-be-yam.com | T02 | Senior Software Engineer | E004 | 2020-01-06 | 6 | Active | 18 | Empty'em, Apple Computer Science | 2 | SG_STD | SG_STD | SG |
-| E006 | Rahul Menon | rahul.menon@i-be-yam.com | T02 | Software Engineer | E004 | 2022-07-04 | 4 | Active | 18 | Empty'em | 1 | SG_STD | SG_STD | SG |
-| E007 | Sarah Koh | sarah.koh@i-be-yam.com | T02 | Software Engineer | E004 | 2025-03-17 | 1 | Active | 15 | Empty'em | 1 | SG_STD | SG_STD | SG |
-| E008 | Jun Wei Ong | junwei.ong@i-be-yam.com | T02 | QA Engineer | E004 | 2024-11-04 | 1 | Active | 15 | Empty'em | 1 | SG_STD | SG_STD | SG |
-| E009 | Fatimah Yusof | fatimah.yusof@i-be-yam.com | T03 | Sales Manager | E001 | 2019-04-15 | 7 | Active | 18 | Diva Counter Strike | 1 | SG_STD | SG_STD | SG |
-| E010 | Kevin Teo | kevin.teo@i-be-yam.com | T03 | Account Executive | E009 | 2021-08-02 | 5 | Active | 18 | Diva Counter Strike | 1 | SG_STD | SG_STD | SG |
-| E011 | Michelle Goh | michelle.goh@i-be-yam.com | T03 | Account Executive | E009 | 2023-10-09 | 2 | Active | 15 | Diva Counter Strike, Meow Woof Arf | 2 | SG_STD | SG_STD | SG |
-| E012 | Arjun Pillai | arjun.pillai@i-be-yam.com | T03 | Sales Associate | E009 | 2026-01-12 | 0 | Active | 15 | Diva Counter Strike | 1 | SG_STD | SG_STD | SG |
-| E013 | Grace Lee | grace.lee@i-be-yam.com | T04 | Operations Manager | E001 | 2014-05-19 | 12 | Active | 21 | Apple Computer Science | 1 | SG_STD | SG_STD | SG |
-| E014 | Ismail Hassan | ismail.hassan@i-be-yam.com | T04 | Operations Executive | E013 | 2022-02-14 | 4 | Active | 18 | Apple Computer Science, Diva Counter Strike | 2 | SG_STD | SG_STD | SG |
-| E015 | Cheryl Wong | cheryl.wong@i-be-yam.com | T04 | Operations Coordinator | E013 | 2025-09-01 | 1 | Active | 15 | Apple Computer Science | 1 | SG_STD | SG_STD | SG |
+| user_id | full_name | email | home_team_id | job_title | manager_id | join_date | years_of_service | employment_status | annual_leave_entitlement | all_teams | team_count | time_profile_code | work_schedule_code | holiday_calendar_code | project_id |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| E001 | Priya Nair | priya.nair@i-be-yam.com | T01 | Managing Director |  | 2015-03-02 | 11 | Active | 21 | Man Age Men-T | 1 | SG_STD | SG_STD | SG |  |
+| E002 | Daniel Tan | daniel.tan@i-be-yam.com | T05 | HR Manager | E001 | 2017-06-12 | 9 | Active | 21 | Meow Woof Arf | 1 | SG_STD | SG_STD | SG |  |
+| E003 | Aisha Rahman | aisha.rahman@i-be-yam.com | T05 | HR Executive | E002 | 2023-02-01 | 3 | Active | 15 | Meow Woof Arf | 1 | SG_STD | SG_STD | SG |  |
+| E004 | Marcus Lim | marcuslim94@proton.me | T02 | Engineering Manager | E001 | 2018-09-03 | 8 | Active | 21 | Empty'em | 1 | SG_STD | SG_STD | SG | PROJ_ENG |
+| E005 | Wei Ling Chua | chuaweiling@proton.me | T02 | Senior Software Engineer | E004 | 2020-01-06 | 6 | Active | 18 | Empty'em, Apple Computer Science | 2 | SG_STD | SG_STD | SG | PROJ_ENG |
+| E006 | Rahul Menon | rahul.menon@i-be-yam.com | T02 | Software Engineer | E004 | 2022-07-04 | 4 | Active | 18 | Empty'em | 1 | SG_STD | SG_STD | SG | PROJ_ENG |
+| E007 | Sarah Koh | sarah.koh@i-be-yam.com | T02 | Software Engineer | E004 | 2025-03-17 | 1 | Active | 15 | Empty'em | 1 | SG_STD | SG_STD | SG | PROJ_ENG |
+| E008 | Jun Wei Ong | junwei.ong@i-be-yam.com | T02 | QA Engineer | E004 | 2024-11-04 | 1 | Active | 15 | Empty'em | 1 | SG_STD | SG_STD | SG | PROJ_ENG |
+| E009 | Fatimah Yusof | fatimah.yusof@i-be-yam.com | T03 | Sales Manager | E001 | 2019-04-15 | 7 | Active | 18 | Diva Counter Strike | 1 | SG_STD | SG_STD | SG |  |
+| E010 | Kevin Teo | kevin.teo@i-be-yam.com | T03 | Account Executive | E009 | 2021-08-02 | 5 | Active | 18 | Diva Counter Strike | 1 | SG_STD | SG_STD | SG |  |
+| E011 | Michelle Goh | michelle.goh@i-be-yam.com | T03 | Account Executive | E009 | 2023-10-09 | 2 | Active | 15 | Diva Counter Strike, Meow Woof Arf | 2 | SG_STD | SG_STD | SG |  |
+| E012 | Arjun Pillai | arjun.pillai@i-be-yam.com | T03 | Sales Associate | E009 | 2026-01-12 | 0 | Active | 15 | Diva Counter Strike | 1 | SG_STD | SG_STD | SG |  |
+| E013 | Grace Lee | grace.lee@i-be-yam.com | T04 | Operations Manager | E001 | 2014-05-19 | 12 | Active | 21 | Apple Computer Science | 1 | SG_STD | SG_STD | SG |  |
+| E014 | Ismail Hassan | ismail.hassan@i-be-yam.com | T04 | Operations Executive | E013 | 2022-02-14 | 4 | Active | 18 | Apple Computer Science, Diva Counter Strike | 2 | SG_STD | SG_STD | SG |  |
+| E015 | Cheryl Wong | cheryl.wong@i-be-yam.com | T04 | Operations Coordinator | E013 | 2025-09-01 | 1 | Active | 15 | Apple Computer Science | 1 | SG_STD | SG_STD | SG |  |
 
 ## Teams
 
@@ -119,6 +124,7 @@ File: `05_Time_Type.csv`
 | OIL | Off-in-Lieu | Days | ACC_OIL | Yes | No | Work schedule | Earned for work on rest days or public holidays; each credit expires 3 months after the earned date (assumption) |
 | SL | Sick Leave (outpatient) | Days | ACC_SL | No | Yes | Work schedule | Notify manager; medical certificate required |
 | HL | Hospitalisation Leave | Days | ACC_HL | No | Yes | Work schedule | 46 days on top of 14 days SL (60 combined); hospital discharge documentation required |
+| CL | Childcare Leave | Days | ACC_CL | Yes | No | Work schedule | Singapore Childcare Leave; eligibility derived from Dependents + Entitlement_Rules |
 
 ## Time_Account_Type
 
@@ -130,6 +136,7 @@ File: `06_Time_Account_Type.csv`
 | ACC_OIL | Off-in-Lieu Account | Recurring | Earned (ad hoc postings) |  | Earned | 2026-01-01 | 2026-12-31 | No | Each credit expires 3 months after its earned date (assumption); an unused credit gets an Expiry posting | Credits are posted as Ad Hoc Entitlement with an expiry_date |
 | ACC_SL | Sick Leave Account | Recurring | Entitled | SL_ENTITLE | 14 | 2026-01-01 | 2026-12-31 | No | Resets 1 Jan; unused days expire 31 Dec | First-year proration not modelled |
 | ACC_HL | Hospitalisation Leave Account | Recurring | Entitled | HL_ENTITLE | 46 | 2026-01-01 | 2026-12-31 | No | Resets 1 Jan; unused days expire 31 Dec | On top of SL; 60 days combined |
+| ACC_CL | Childcare Leave Account | Recurring | Entitled |  | Annual quota from Entitlement_Rules | 2026-01-01 | 2026-12-31 | No | Resets 1 Jan; unused days expire 31 Dec | Quota determined by child age at 1 Jan; 6 days if child aged 7 or under |
 
 ## Accrual_Rule
 
@@ -153,6 +160,7 @@ File: `08_Time_Profile.csv`
 | SG_STD | OIL | Y | N | N |
 | SG_STD | SL | Y | Y | N |
 | SG_STD | HL | Y | N | N |
+| SG_STD | CL | Y | N | N |
 | SG_CONTRACT | AL | Y | Y | Y |
 | SG_CONTRACT | SL | Y | Y | N |
 
@@ -202,7 +210,7 @@ File: `10_Holiday_Calendar.csv`
 
 File: `11_Time_Account.csv`
 
-60 data rows; see the CSV. Columns: time_account_id, user_id, time_account_type_code, account_valid_from, account_valid_until, account_closed, balance_today, planned_bookings, pending_requests, available, projected_year_end
+61 data rows (four accounts per employee, plus TA061 for E005's Childcare Leave); see the CSV. Columns: time_account_id, user_id, time_account_type_code, account_valid_from, account_valid_until, account_closed, balance_today, planned_bookings, pending_requests, available, projected_year_end
 
 Sample (first 3 rows):
 
@@ -345,3 +353,53 @@ File: `16_Agent_Guide.csv`
 | DEMO | multi_team_people | E005 (also T04), E014 (also T03), E011 (also T05). |  |  |  |
 | DEMO | hire_month | E012 joined in January 2026 mid-month; no accrual in the hire month, first accrual is Feb. |  |  |  |
 | CAVEAT | mock_data | Mock data only. Accrual uses today's service tier for all months. OIL 3-month expiry is an assumption. Schema is modelled on public SAP SuccessFactors Time Off docs, not a live tenant. See SF_Mapping. |  |  |  |
+
+## Dependents
+
+File: `17_Dependents.csv`. Read by `check_childcare_eligibility` (`backend/tools/hr.py`) to compute each child's age at 1 Jan.
+
+| dependent_id | user_id | name | date_of_birth | relationship |
+|---|---|---|---|---|
+| DEP001 | E005 | Ethan Chua | 2020-03-15 | Child |
+
+## Entitlement_Rules
+
+File: `18_Entitlement_Rules.csv`. Childcare Leave quota tiers, matched against the child's age at 1 Jan.
+
+| rule_id | time_type_code | condition_field | condition_operator | condition_value | annual_quota_days | notes |
+|---|---|---|---|---|---|---|
+| ER001 | CL | child_age_at_jan1 | <= | 7 | 6 | Singapore Childcare Leave — child aged 7 or under at 1 Jan; 6 days per year |
+| ER002 | CL | child_age_at_jan1 | <= | 12 | 2 | Extended Childcare Leave — child aged 8 to 12 at 1 Jan; 2 days per year |
+
+## Project_Events
+
+File: `19_Project_Events.csv`. Read by `get_project_events` (`backend/tools/team_project.py`); employees are linked to a project through `Job_Information.project_id`.
+
+| event_id | project_id | event_type | start_date | end_date | description |
+|---|---|---|---|---|---|
+| PE001 | PROJ_ENG | CHANGE_WINDOW | 2026-10-27 | 2026-10-28 | System change freeze — no engineering leave; release stabilisation |
+| PE002 | PROJ_ENG | DEPLOYMENT | 2026-11-03 | 2026-11-03 | Production release v2.1 |
+
+## Companies
+
+File: `20_Companies.csv`. Used by `backend/tools/policy_rag.py` to pick which policy document in `policies/` applies to an employee (defaults to IBM).
+
+| company_id | company_name | contract_hr_email | time_profile_code | policy_file |
+|---|---|---|---|---|
+| IBM | IBM Singapore | hr@i-be-yam.com | SG_STD | ibm_leave_policy.md |
+| ContractCo | ContractCo Pte Ltd | hr@contractco.example.com | SG_CONTRACT | contractco_leave_policy.md |
+
+## Users
+
+File: `21_Users.csv`. Login accounts for the web UI, read by `backend/auth.py`. Each username maps to an existing employee `user_id`; passwords are stored as salted SHA-256 hashes (salt and hash values are not reproduced here).
+
+| username | user_id | display_name |
+|---|---|---|
+| weiling | E005 | Wei Ling Chua |
+| marcus | E004 | Marcus Lim |
+| fatimah | E009 | Fatimah Yusof |
+
+## Demo scenarios added with files 17–21
+
+- Childcare Leave: E005 has one child (DEP001, aged 5 at 1 Jan 2026), so ER001 applies and TA061 holds 6 CL days.
+- Project conflict: PE001 freezes engineering leave on 27–28 Oct, the same dates the T02 coverage clash (R009–R011) goes SHORT. PROJ_ENG covers E004–E008.

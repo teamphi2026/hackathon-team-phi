@@ -1,0 +1,3 @@
+rule_id,time_type_code,condition_field,condition_operator,condition_value,annual_quota_days,notes
+ER001,CL,child_age_at_jan1,<=,7,6,Singapore Childcare Leave — child aged 7 or under at 1 Jan; 6 days per year
+ER002,CL,child_age_at_jan1,<=,12,2,Extended Childcare Leave — child aged 8 to 12 at 1 Jan; 2 days per year

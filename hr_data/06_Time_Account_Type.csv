@@ -3,3 +3,4 @@ ACC_AL,Annual Leave Account,Recurring,Accrued,AL_ACCRUAL,Tiered by years of serv
 ACC_OIL,Off-in-Lieu Account,Recurring,Earned (ad hoc postings),,Earned,2026-01-01,2026-12-31,No,Each credit expires 3 months after its earned date (assumption); an unused credit gets an Expiry posting,Credits are posted as Ad Hoc Entitlement with an expiry_date
 ACC_SL,Sick Leave Account,Recurring,Entitled,SL_ENTITLE,14,2026-01-01,2026-12-31,No,Resets 1 Jan; unused days expire 31 Dec,First-year proration not modelled
 ACC_HL,Hospitalisation Leave Account,Recurring,Entitled,HL_ENTITLE,46,2026-01-01,2026-12-31,No,Resets 1 Jan; unused days expire 31 Dec,On top of SL; 60 days combined
+ACC_CL,Childcare Leave Account,Recurring,Entitled,,Annual quota from Entitlement_Rules,2026-01-01,2026-12-31,No,Resets 1 Jan; unused days expire 31 Dec,Quota determined by child age at 1 Jan; 6 days if child aged 7 or under

@@ -3,3 +3,4 @@ AL,Annual Leave,Days,ACC_AL,Yes,No,Work schedule,Entitlement accrues monthly; se
 OIL,Off-in-Lieu,Days,ACC_OIL,Yes,No,Work schedule,Earned for work on rest days or public holidays; each credit expires 3 months after the earned date (assumption)
 SL,Sick Leave (outpatient),Days,ACC_SL,No,Yes,Work schedule,Notify manager; medical certificate required
 HL,Hospitalisation Leave,Days,ACC_HL,No,Yes,Work schedule,46 days on top of 14 days SL (60 combined); hospital discharge documentation required
+CL,Childcare Leave,Days,ACC_CL,Yes,No,Work schedule,Singapore Childcare Leave; eligibility derived from Dependents + Entitlement_Rules

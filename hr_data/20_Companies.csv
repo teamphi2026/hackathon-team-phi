@@ -1,0 +1,3 @@
+company_id,company_name,contract_hr_email,time_profile_code,policy_file
+IBM,IBM Singapore,hr@i-be-yam.com,SG_STD,ibm_leave_policy.md
+ContractCo,ContractCo Pte Ltd,hr@contractco.example.com,SG_CONTRACT,contractco_leave_policy.md

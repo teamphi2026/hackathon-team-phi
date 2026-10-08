@@ -1,0 +1,3 @@
+event_id,project_id,event_type,start_date,end_date,description
+PE001,PROJ_ENG,CHANGE_WINDOW,2026-10-27,2026-10-28,System change freeze — no engineering leave; release stabilisation
+PE002,PROJ_ENG,DEPLOYMENT,2026-11-03,2026-11-03,Production release v2.1

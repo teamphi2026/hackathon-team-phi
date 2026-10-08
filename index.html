@@ -699,33 +699,10 @@
 
     let appState = {
       status: STATE.DRAFT,
-      step: 0,           // tracks which demo step we're on
       inputLocked: false
     };
 
-    // ─── Demo data ───────────────────────────────────────────────────────────
-    const DEMO = {
-      employee:    'Alex Tan',
-      team:        'TEAM_PLATFORM',
-      project:     'PROJECT_ALPHA',
-      manager:     'Sarah Lim',
-      leaveType:   'Childcare Leave',
-      origDates:   '14–16 Oct 2026',
-      recDates:    '21–23 Oct 2026',
-      days:        3,
-      balanceBefore: 5,
-      balanceAfter:  2,
-      refId:       'LV-2026-00142'
-    };
-
-    // ─── Mock demo script ────────────────────────────────────────────────────
-    // Each "step" is triggered by a user message.
-    // step 0 = initial greeting already shown
-    // step 1 = user sends the main leave request
-    // step 2 = user confirms recommendation
-    // (manager approval is handled separately via buttons)
-
-    // ─── Helpers ─────────────────────────────────────────────────────────────
+    // ─── UI helpers (shared with the backend integration script below) ────────
     function now() {
       return new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
     }
@@ -749,7 +726,6 @@
     function sendQuick(btn) {
       const input = document.getElementById('chatInput');
       input.value = btn.textContent;
-      // hide quick prompts after first use
       document.getElementById('quickPrompts').style.display = 'none';
       sendMessage();
     }
@@ -760,31 +736,6 @@
       document.getElementById('sendBtn').disabled = lock;
     }
 
-    // ─── Activity panel helpers ───────────────────────────────────────────────
-    function addActivity(type, icon, text, delay = 0) {
-      return new Promise(resolve => {
-        setTimeout(() => {
-          const empty = document.getElementById('activityEmpty');
-          if (empty) empty.style.display = 'none';
-
-          const log = document.getElementById('activityLog');
-          const item = document.createElement('div');
-          item.className = `activity-item ${type}`;
-          item.innerHTML = `<span class="activity-icon">${icon}</span><span>${text}</span>`;
-          log.appendChild(item);
-          scrollToBottom(log);
-          resolve();
-        }, delay);
-      });
-    }
-
-    async function runActivitySequence(items) {
-      for (const [type, icon, text, delay] of items) {
-        await addActivity(type, icon, text, delay);
-      }
-    }
-
-    // ─── Chat message helpers ─────────────────────────────────────────────────
     function appendUserMessage(text) {
       const msgs = document.getElementById('messages');
       const el = document.createElement('div');
@@ -841,323 +792,6 @@
     function escHtml(s) {
       return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
-
-    // ─── Main send handler ────────────────────────────────────────────────────
-    async function sendMessage() {
-      if (appState.inputLocked) return;
-
-      const input = document.getElementById('chatInput');
-      const text = input.value.trim();
-      if (!text) return;
-
-      input.value = '';
-      input.style.height = 'auto';
-
-      appendUserMessage(text);
-      lockInput(true);
-
-      const lc = text.toLowerCase();
-
-      // Route based on current state + keywords
-      if (appState.status === STATE.DRAFT) {
-        if (lc.includes('balance') || lc.includes('entitlement')) {
-          await handleBalanceQuery();
-        } else if (lc.includes('eligible') || lc.includes('childcare')) {
-          await handleEligibilityQuery();
-        } else {
-          // Main leave planning flow
-          await handleLeaveRequest();
-        }
-      } else if (appState.status === STATE.PENDING_MANAGER_APPROVAL ||
-                 appState.status === STATE.EMPLOYEE_CONFIRMED) {
-        appendAgentMessage("I'm waiting for the manager to approve your request. You can see the approval panel on the right. ⏸");
-        lockInput(false);
-      } else if (appState.status === STATE.SUBMITTED) {
-        appendAgentMessage("Your leave has already been submitted! Reference ID: <strong class='ref-id' style='color:var(--accent2); font-family:monospace'>" + DEMO.refId + "</strong>. Is there anything else I can help you with?");
-        lockInput(false);
-      } else if (appState.status === STATE.EMPLOYEE_CONFIRMED) {
-        appendAgentMessage("Your request is confirmed and pending manager approval.");
-        lockInput(false);
-      } else {
-        // Check for confirmation keywords after a recommendation
-        if (appState.step === 2 &&
-            (lc.includes('yes') || lc.includes('proceed') || lc.includes('sounds') || lc.includes('confirm') || lc.includes('submit') || lc.includes('go ahead') || lc.includes('ok') || lc.includes('great'))) {
-          await handleConfirmation();
-        } else {
-          appendAgentMessage("Sure — let me help with that. For the demo, please use the main leave request scenario or try the quick prompt buttons.");
-          lockInput(false);
-        }
-      }
-    }
-
-    // ─── Balance-only query ───────────────────────────────────────────────────
-    async function handleBalanceQuery() {
-      showTyping();
-      await runActivitySequence([
-        ['working', '🔍', 'Retrieving employee profile...', 300],
-        ['ok', '✓', 'Profile found — Alex Tan, TEAM_PLATFORM', 900],
-        ['working', '🔍', 'Fetching leave entitlements...', 1400],
-        ['ok', '✓', 'Entitlements loaded', 2000],
-      ]);
-      setTimeout(() => {
-        appendAgentMessage(`Here's your current leave balance, Alex:<br><br>
-          <strong>Annual Leave:</strong> 12 days remaining (20 entitled, 8 used)<br>
-          <strong>Childcare Leave:</strong> 5 days remaining (6 entitled, 1 used)<br><br>
-          Would you like help planning when to use them?`);
-        lockInput(false);
-      }, 2400);
-    }
-
-    // ─── Eligibility-only query ────────────────────────────────────────────────
-    async function handleEligibilityQuery() {
-      showTyping();
-      await runActivitySequence([
-        ['working', '🔍', 'Retrieving employee profile...', 300],
-        ['ok', '✓', 'Profile found — Alex Tan', 800],
-        ['working', '🔍', 'Checking dependent data...', 1200],
-        ['ok', '✓', 'Child age 6 confirmed — under 7 threshold', 1700],
-        ['ok', '✓', 'Childcare Leave eligibility: ELIGIBLE', 2100],
-      ]);
-      setTimeout(() => {
-        appendAgentMessage(`Yes — you're eligible for <strong>Childcare Leave</strong>. You have a child aged 6 (under 7), so you qualify under Singapore MOM policy.<br><br>
-          You currently have <strong>5 days remaining</strong> out of your 6-day annual entitlement.<br><br>
-          Would you like to plan some Childcare Leave?`);
-        lockInput(false);
-      }, 2500);
-    }
-
-    // ─── Main leave planning flow ─────────────────────────────────────────────
-    async function handleLeaveRequest() {
-      appState.step = 1;
-      showTyping();
-
-      // Activity: HR context
-      await runActivitySequence([
-        ['working', '🔍', 'Retrieving employee profile (E001)...', 400],
-        ['ok',      '✓',  'Profile found — Alex Tan, TEAM_PLATFORM, PROJECT_ALPHA', 1000],
-        ['working', '🔍', 'Checking dependents...', 1400],
-        ['ok',      '✓',  'Child age 6 — Childcare Leave eligibility confirmed', 1900],
-        ['working', '🔍', 'Fetching leave entitlements...', 2300],
-        ['ok',      '✓',  'Annual Leave: 12 days remaining', 2800],
-        ['ok',      '✓',  'Childcare Leave: 5 days remaining', 3100],
-      ]);
-
-      // Activity: Team + project context
-      await runActivitySequence([
-        ['working', '🔍', 'Checking team availability 14–16 Oct...', 3600],
-        ['fail',    '✗',  'Coverage RISK — 2 of 3 required members available', 4300],
-        ['working', '🔍', 'Fetching project events 14–16 Oct...', 4700],
-        ['fail',    '✗',  'Conflict: Production deployment on 16 Oct (PROJECT_ALPHA)', 5400],
-        ['info',    '⚠',  '14–16 Oct has advisory constraints (coverage + deployment)', 5900],
-      ]);
-
-      // Activity: Alternative search
-      await runActivitySequence([
-        ['working', '🔍', 'Dates are flexible — searching viable alternatives within 14 days...', 6400],
-        ['ok',      '✓',  'Checking 14 nearby date ranges...', 7000],
-        ['ok',      '✓',  'Pre-filtering: balance OK, coverage OK, no blackout', 7500],
-        ['ok',      '✓',  'Found 3 viable candidate ranges', 8000],
-        ['rec',     '→',  'Comparing candidates: 21–23 Oct is conflict-free', 8600],
-        ['rec',     '→',  'Recommended: 21–23 Oct 2026 (Childcare Leave)', 9000],
-      ]);
-
-      setTimeout(() => {
-        const recCard = `
-          <div class="rec-card">
-            <div class="rec-title">📋 Recommendation</div>
-            <div class="rec-row">
-              <span class="rec-label">Leave type</span>
-              <span class="rec-value">Childcare Leave</span>
-            </div>
-            <div class="rec-row">
-              <span class="rec-label">Dates</span>
-              <span class="rec-value">21–23 Oct 2026</span>
-            </div>
-            <div class="rec-row">
-              <span class="rec-label">Working days</span>
-              <span class="rec-value">3</span>
-            </div>
-            <div class="rec-row">
-              <span class="rec-label">Balance after</span>
-              <span class="rec-value">2 days remaining</span>
-            </div>
-            <div class="rec-reason">
-              <strong>Why not 14–16 Oct?</strong> Team coverage falls below the 3-person minimum (2 available) and there is a production deployment on 16 Oct for PROJECT_ALPHA.<br><br>
-              <strong>Why 21–23 Oct?</strong> Full team coverage, no project milestones or deployment windows. You qualify for Childcare Leave (child age 6), so I'm recommending that over Annual Leave to preserve your AL balance.
-            </div>
-          </div>
-          <div class="confirm-row" style="margin-top:8px;">
-            <button class="btn-confirm yes" onclick="handleConfirmation()" id="btnYes">✓ Confirm &amp; request approval</button>
-            <button class="btn-confirm no" onclick="declineRec()">✗ Different dates</button>
-          </div>`;
-
-        appendAgentMessage(
-          `I checked your entitlements, team availability, and project calendar for <strong>14–16 Oct</strong>.<br><br>
-           I found two issues: coverage is below the team minimum, and there's a production deployment on 16 Oct.<br><br>
-           I searched nearby dates and recommend <strong>21–23 Oct</strong> on <strong>Childcare Leave</strong> instead:`,
-          recCard
-        );
-
-        appState.step = 2;
-        lockInput(false);
-      }, 9400);
-    }
-
-    // ─── Employee confirmation ─────────────────────────────────────────────────
-    async function handleConfirmation() {
-      // Disable confirm buttons
-      const btn = document.getElementById('btnYes');
-      if (btn) btn.disabled = true;
-      const btnNo = document.querySelector('.btn-confirm.no');
-      if (btnNo) btnNo.disabled = true;
-
-      lockInput(true);
-      appState.status = STATE.EMPLOYEE_CONFIRMED;
-
-      showTyping();
-      await addActivity('ok', '✓', 'Employee confirmed — transitioning to EMPLOYEE_CONFIRMED', 400);
-      await addActivity('working', '📤', 'Requesting manager approval from Sarah Lim...', 900);
-      await addActivity('waiting', '⏸', 'Status: PENDING_MANAGER_APPROVAL', 1400);
-
-      setTimeout(() => {
-        appendAgentMessage(
-          `Got it! I've sent an approval request to your manager <strong>Sarah Lim</strong>.<br><br>
-           The request is now <span class="status-chip pending"><span class="chip-dot"></span>Pending Approval</span><br><br>
-           You can see the approval card on the right panel. I'll update you once Sarah responds.`
-        );
-        appState.status = STATE.PENDING_MANAGER_APPROVAL;
-        showApprovalCard();
-        lockInput(true);
-      }, 1800);
-    }
-
-    function declineRec() {
-      appendAgentMessage("No problem! What dates would work better for you? I can search a different window.");
-      appState.step = 0;
-      appState.status = STATE.DRAFT;
-      lockInput(false);
-    }
-
-    // ─── Manager approval card ─────────────────────────────────────────────────
-    function showApprovalCard() {
-      document.getElementById('apr-employee').textContent = DEMO.employee;
-      document.getElementById('apr-type').textContent = DEMO.leaveType;
-      document.getElementById('apr-dates').textContent = DEMO.recDates;
-      document.getElementById('apr-days').textContent = DEMO.days + ' days';
-      document.getElementById('apr-balance').textContent = DEMO.balanceAfter + ' days remaining after';
-      document.getElementById('apr-conflicts').innerHTML = `
-        <div>
-          <span class="conflict-tag risk">✗ Coverage RISK 14–16 Oct</span>
-          <span class="conflict-tag warn">⚠ Deployment 16 Oct</span>
-          <span class="conflict-tag ok">✓ 21–23 Oct conflict-free</span>
-        </div>`;
-      document.getElementById('apr-rationale').textContent =
-        'Childcare Leave recommended over Annual Leave — child age 6 qualifies. 21–23 Oct has full team coverage and no project events.';
-      document.getElementById('approvalSection').classList.add('visible');
-    }
-
-    async function managerApprove() {
-      document.getElementById('btnApprove').disabled = true;
-      document.getElementById('btnReject').disabled = true;
-      appState.status = STATE.APPROVED;
-
-      await addActivity('ok', '✓', 'Manager Sarah Lim: APPROVED', 200);
-      await addActivity('working', '📡', 'Invoking submit_leave() → mocked AskHR/SuccessFactors...', 700);
-      await addActivity('ok', '✓', 'Leave submitted — reference ' + DEMO.refId, 1400);
-      await addActivity('done', '🎉', 'Status: SUBMITTED', 1800);
-
-      setTimeout(() => {
-        const banner = `
-          <div class="confirmation-banner">
-            <div class="banner-title">✅ Leave Submitted</div>
-            <div style="margin-bottom:6px;">Your leave has been recorded in the system.</div>
-            <div class="rec-row" style="margin-bottom:4px; font-size:12.5px; display:flex; justify-content:space-between;">
-              <span style="color:var(--muted)">Leave Type</span><span style="font-weight:600">${DEMO.leaveType}</span>
-            </div>
-            <div class="rec-row" style="margin-bottom:4px; font-size:12.5px; display:flex; justify-content:space-between;">
-              <span style="color:var(--muted)">Dates</span><span style="font-weight:600">${DEMO.recDates}</span>
-            </div>
-            <div class="rec-row" style="margin-bottom:4px; font-size:12.5px; display:flex; justify-content:space-between;">
-              <span style="color:var(--muted)">Working Days</span><span style="font-weight:600">${DEMO.days} days</span>
-            </div>
-            <div class="rec-row" style="margin-bottom:4px; font-size:12.5px; display:flex; justify-content:space-between;">
-              <span style="color:var(--muted)">Status</span><span class="status-chip approved" style="font-size:11px; padding:2px 8px;"><span class="chip-dot"></span>Approved</span>
-            </div>
-            <div style="margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.06); font-size:12px; color:var(--muted)">
-              Reference ID: <span class="ref-id">${DEMO.refId}</span>
-            </div>
-          </div>`;
-
-        appendAgentMessage(
-          `Great news! Sarah has <strong>approved</strong> your leave request. I've submitted it to the HR system. 🎉`,
-          banner
-        );
-        appState.status = STATE.SUBMITTED;
-        document.getElementById('approvalSection').classList.remove('visible');
-        lockInput(false);
-      }, 2200);
-    }
-
-    async function managerReject() {
-      document.getElementById('btnApprove').disabled = true;
-      document.getElementById('btnReject').disabled = true;
-      appState.status = STATE.REJECTED;
-
-      await addActivity('fail', '✗', 'Manager Sarah Lim: REJECTED', 200);
-      await addActivity('info', 'ℹ', 'submit_leave() not called — approval_status != APPROVED', 600);
-
-      setTimeout(() => {
-        appendAgentMessage(
-          `Sarah has <strong>rejected</strong> the request. No leave has been submitted.<br><br>
-           Would you like to request a different date range or explore other options?`
-        );
-        document.getElementById('approvalSection').classList.remove('visible');
-        appState.status = STATE.DRAFT;
-        appState.step = 0;
-        lockInput(false);
-      }, 1000);
-    }
-
-    // ─── Demo reset ────────────────────────────────────────────────────────────
-    function resetDemo() {
-      // Reset state
-      appState = { status: STATE.DRAFT, step: 0, inputLocked: false };
-
-      // Clear messages
-      const msgs = document.getElementById('messages');
-      msgs.innerHTML = `
-        <div class="msg agent">
-          <div class="msg-avatar">A</div>
-          <div class="msg-body">
-            <div class="msg-bubble">
-              Hi! I'm your leave planning assistant. I can help you find the best time to take leave by checking your entitlements, team availability, and project milestones.<br><br>
-              What are you planning?
-            </div>
-            <div class="msg-time">Just now</div>
-          </div>
-        </div>`;
-
-      // Clear activity log
-      const log = document.getElementById('activityLog');
-      log.innerHTML = `
-        <div class="activity-empty" id="activityEmpty">
-          <div class="empty-icon">🤖</div>
-          <div class="empty-text">Agent tool calls and reasoning steps will appear here during the demo.</div>
-        </div>`;
-
-      // Reset approval section
-      document.getElementById('approvalSection').classList.remove('visible');
-      document.getElementById('btnApprove').disabled = false;
-      document.getElementById('btnReject').disabled = false;
-
-      // Restore quick prompts
-      const qp = document.getElementById('quickPrompts');
-      qp.style.display = 'flex';
-
-      // Unlock input
-      lockInput(false);
-      document.getElementById('chatInput').value = '';
-    }
   </script>
 
   <!-- ─── Real backend integration (Task 10) ─────────────────────────────────
@@ -1165,7 +799,11 @@
        Set API_BASE to the backend URL (defaults to same origin). If the
        backend is unreachable the mock handlers remain as a fallback. -->
   <script>
-    const API_BASE = (window.LEAVE_API_BASE || '').replace(/\/$/, '');
+    // Backend API URL. Defaults to the local FastAPI server on port 8000.
+    // Override by setting window.LEAVE_API_BASE before this script runs
+    // (e.g. for a deployed backend). Leave as '' to use the same origin.
+    const DEFAULT_API_BASE = 'http://localhost:8000';
+    const API_BASE = (window.LEAVE_API_BASE || DEFAULT_API_BASE).replace(/\/$/, '');
     const api = (path) => `${API_BASE}${path}`;
 
     // Icon per activity status emitted by the backend.

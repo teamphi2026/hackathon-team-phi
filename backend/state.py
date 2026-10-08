@@ -45,6 +45,13 @@ class SessionState:
     # {token: {employee_time_id, action, expiry, used}} — managed by email_service
     approval_token_map: dict[str, Any] = field(default_factory=dict)
 
+    # Context for the dynamic suggestion chips.
+    turn_tools: list[str] = field(default_factory=list)        # tools used this turn
+    history: list[dict[str, Any]] = field(default_factory=list)  # [{message, tools}] per turn
+    # A leave option that has been assessed but not yet confirmed/submitted:
+    # {leave_type, start_date, end_date, date_label, working_days}
+    last_assessed: dict[str, Any] | None = None
+
     # activity log for the Agent Activity panel
     activity: list[dict[str, Any]] = field(default_factory=list)
 

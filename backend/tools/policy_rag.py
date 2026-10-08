@@ -1,8 +1,9 @@
 """Policy RAG tool — Task 8.
 
 search_policy(question) returns the best-matching policy section(s) with a
-heading citation, bound to the session user's company (resolved server-side —
-the model cannot choose which policy to read).
+heading citation, bound to the session user's EMPLOYER (resolved server-side —
+the model cannot choose which policy to read). Different employers have different
+policies, e.g. I Be Yam vs He Be Tomato.
 
 Embedding backend:
   * sentence-transformers (all-MiniLM-L6-v2) when installed.
@@ -20,36 +21,36 @@ from ..config import POLICIES_DIR
 from ..state import get_session
 from . import actions
 
-# Map the session user's company to its policy file. For the hackathon all demo
-# employees are IBM; contractors (P1) resolve to the ContractCo policy.
-_COMPANY_POLICY = {
-    "IBM": "ibm_leave_policy.md",
-    "ContractCo": "contractco_leave_policy.md",
-}
-_DEFAULT_POLICY = "ibm_leave_policy.md"
-
-
 # ---------------------------------------------------------------------------
-# Company resolution (server-side, never from the LLM)
+# Employer -> policy resolution (server-side, never from the LLM)
 # ---------------------------------------------------------------------------
+# Each employee's `employer` (02_Job_Information.csv) is matched to a row in
+# 20_Companies.csv (company_name), whose `policy_file` names the document in
+# policies/. Employers differ (e.g. "I Be Yam" vs "He Be Tomato"), so an
+# employee only ever reads their own employer's policy. If the employer has no
+# policy on file we say so; we never substitute another employer's policy.
 
-def _company_for_user(uid: str) -> str:
-    """Resolve the user's company from their email domain / Companies table."""
+def _norm(name: str) -> str:
+    return " ".join((name or "").lower().split())
+
+
+def _employer_for_user(uid: str) -> dict[str, str]:
+    """Resolve {employer, company_id, policy_file} for the user ('' if unknown)."""
     _, people = actions._read_rows("02_Job_Information.csv")
     person = next((r for r in people if r["user_id"] == uid), None)
-    if person is None:
-        return "IBM"
-    email = person.get("email", "")
+    employer = (person or {}).get("employer", "").strip()
+    out = {"employer": employer, "company_id": "", "policy_file": ""}
+    if not employer:
+        return out
     try:
         _, companies = actions._read_rows("20_Companies.csv")
     except FileNotFoundError:
-        return "IBM"
-    for c in companies:
-        hr_email = c.get("contract_hr_email", "")
-        domain = hr_email.split("@")[-1] if "@" in hr_email else ""
-        if domain and email.endswith("@" + domain):
-            return c["company_id"]
-    return "IBM"
+        return out
+    row = next((c for c in companies if _norm(c.get("company_name", "")) == _norm(employer)), None)
+    if row:
+        out["company_id"] = row.get("company_id", "")
+        out["policy_file"] = (row.get("policy_file") or "").strip()
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -132,7 +133,7 @@ def _cosine_sparse(a: dict[str, float], b: dict[str, float]) -> float:
 # Index (per policy file, cached)
 # ---------------------------------------------------------------------------
 
-@lru_cache(maxsize=4)
+@lru_cache(maxsize=8)
 def _index(policy_file: str) -> dict[str, Any] | None:
     path = POLICIES_DIR / policy_file
     if not path.exists():
@@ -156,12 +157,19 @@ def _index(policy_file: str) -> dict[str, Any] | None:
 def search_policy(question: str, top_k: int = 2) -> dict[str, Any]:
     """Return the top matching policy section(s) with heading citations."""
     uid = get_session().session_user_id
-    company = _company_for_user(uid)
-    policy_file = _COMPANY_POLICY.get(company, _DEFAULT_POLICY)
+    info = _employer_for_user(uid)
+    employer, company, policy_file = info["employer"], info["company_id"], info["policy_file"]
+    base = {"employer": employer, "company": company}
 
+    if not policy_file or _index(policy_file) is None:
+        who = employer or "your employer"
+        return {
+            "answer": f"I don't have a leave policy document on file for {who}. "
+                      f"Please check with your HR contact.",
+            "citations": [],
+            **base,
+        }
     idx = _index(policy_file)
-    if idx is None:
-        return {"answer": "Policy document not yet loaded.", "citations": [], "company": company}
 
     chunks = idx["chunks"]
     if idx["backend"] == "st":
@@ -190,11 +198,11 @@ def search_policy(question: str, top_k: int = 2) -> dict[str, Any]:
         return {
             "answer": "I couldn't find a relevant policy section for that question.",
             "citations": [],
-            "company": company,
+            **base,
         }
     top = citations[0]
     return {
         "answer": f"{top['text']} (See '{top['section']}' in {policy_file}.)",
         "citations": citations,
-        "company": company,
+        **base,
     }

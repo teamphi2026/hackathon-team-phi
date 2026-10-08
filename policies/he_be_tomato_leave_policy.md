@@ -1,4 +1,4 @@
-# ContractCo Pte Ltd — Leave Policy (Demo)
+# He Be Tomato Pte Ltd — Leave Policy (Demo)
 
 > Illustrative contractor policy for the hackathon demo.
 

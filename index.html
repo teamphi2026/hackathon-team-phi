@@ -4,6 +4,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Leave Agent — Team Phi</title>
+  <script>
+    // Apply saved (or system) theme before first paint to avoid a flash.
+    (function () {
+      var t = localStorage.getItem('leave_theme');
+      if (!t) t = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
   <style>
     /* ─── Reset & Base ─────────────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -23,6 +31,55 @@
       --red:       #ef4444;
       --blue:      #3b82f6;
       --radius:    14px;
+
+      --panel:        #121829;
+      --hover-bg:     rgba(255,255,255,0.05);
+      --hover-border: rgba(255,255,255,0.25);
+      --scroll-thumb: rgba(255,255,255,0.1);
+      --neutral-bg:   rgba(255,255,255,0.1);
+      --accent-text:  #a5b4fc;
+      --ok-text:      #86efac;
+      --fail-text:    #fca5a5;
+      --info-text:    #93c5fd;
+      --warn-text:    #fde68a;
+      --soft-text:    #94a3b8;
+      --chip-self-text: #c7d2fe;
+      --cell-bg:      #182136;
+      --cell-empty:   rgba(255,255,255,0.015);
+      color-scheme: dark;
+    }
+
+    /* Light theme: toggled via <html data-theme="light"> */
+    [data-theme="light"] {
+      --bg:        #f1f5f9;
+      --surface:   #ffffff;
+      --surface2:  #f1f5f9;
+      --border:    rgba(15,23,42,0.10);
+      --border2:   rgba(15,23,42,0.18);
+      --text:      #0f172a;
+      --muted:     #566377;
+      --accent:    #5b52f0;
+      --accent2:   #0891b2;
+      --green:     #15803d;
+      --amber:     #b45309;
+      --red:       #b91c1c;
+      --blue:      #1d4ed8;
+
+      --panel:        #ffffff;
+      --hover-bg:     rgba(15,23,42,0.05);
+      --hover-border: rgba(15,23,42,0.30);
+      --scroll-thumb: rgba(15,23,42,0.18);
+      --neutral-bg:   rgba(15,23,42,0.08);
+      --accent-text:  #4338ca;
+      --ok-text:      #166534;
+      --fail-text:    #b91c1c;
+      --info-text:    #1d4ed8;
+      --warn-text:    #92400e;
+      --soft-text:    #475569;
+      --chip-self-text: #3730a3;
+      --cell-bg:      #ffffff;
+      --cell-empty:   rgba(15,23,42,0.03);
+      color-scheme: light;
     }
 
     html, body { height: 100%; }
@@ -82,7 +139,7 @@
       border-radius: 999px;
       background: rgba(108,99,255,0.15);
       border: 1px solid rgba(108,99,255,0.3);
-      color: #a5b4fc;
+      color: var(--accent-text);
     }
 
     .btn-reset {
@@ -96,7 +153,7 @@
       cursor: pointer;
       transition: all 0.2s;
     }
-    .btn-reset:hover { color: var(--text); border-color: rgba(255,255,255,0.25); background: rgba(255,255,255,0.05); }
+    .btn-reset:hover { color: var(--text); border-color: var(--hover-border); background: var(--hover-bg); }
 
     /* ─── Main Layout ───────────────────────────────────────────────────── */
     .workspace {
@@ -143,7 +200,7 @@
 
     .messages::-webkit-scrollbar { width: 4px; }
     .messages::-webkit-scrollbar-track { background: transparent; }
-    .messages::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+    .messages::-webkit-scrollbar-thumb { background: var(--neutral-bg); border-radius: 2px; }
 
     /* Message bubbles */
     .msg {
@@ -166,7 +223,7 @@
     }
 
     .msg.agent .msg-avatar { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; }
-    .msg.user  .msg-avatar { background: rgba(255,255,255,0.1); color: var(--text); }
+    .msg.user  .msg-avatar { background: var(--neutral-bg); color: var(--text); }
 
     .msg-body { display: flex; flex-direction: column; gap: 4px; }
 
@@ -197,6 +254,30 @@
       padding: 0 2px;
     }
     .msg.user .msg-time { text-align: right; }
+
+    /* Markdown content inside chat bubbles */
+    .msg-body { min-width: 0; }
+    .msg-bubble p { margin: 0 0 8px; }
+    .msg-bubble p:last-child, .msg-bubble ul:last-child, .msg-bubble ol:last-child,
+    .msg-bubble .md-table-wrap:last-child { margin-bottom: 0; }
+    .msg-bubble ul, .msg-bubble ol { margin: 0 0 8px; padding-left: 20px; }
+    .msg-bubble li { margin: 2px 0; }
+    .msg-bubble code {
+      font-family: "SF Mono", "Fira Code", monospace; font-size: 12px;
+      background: var(--hover-bg); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px;
+    }
+    .md-h { font-weight: 700; margin: 4px 0 6px; }
+    .md-table-wrap {
+      overflow-x: auto; margin: 6px 0 10px; border: 1px solid var(--border2); border-radius: 8px;
+    }
+    .md-table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+    .md-table th, .md-table td { padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .md-table th {
+      background: var(--hover-bg); font-weight: 700; font-size: 11px; letter-spacing: 0.04em;
+      text-transform: uppercase; color: var(--muted);
+    }
+    .md-table tbody tr:last-child td { border-bottom: none; }
+    .md-table tbody tr:nth-child(even) td { background: var(--hover-bg); }
 
     /* Typing indicator */
     .typing-indicator { display: flex; gap: 4px; align-items: center; padding: 4px 0; }
@@ -231,8 +312,8 @@
     .rec-card .rec-reason {
       margin-top: 10px;
       padding-top: 10px;
-      border-top: 1px solid rgba(255,255,255,0.06);
-      color: #94a3b8;
+      border-top: 1px solid var(--border);
+      color: var(--soft-text);
       font-size: 12.5px;
       line-height: 1.5;
     }
@@ -260,11 +341,11 @@
     }
     .btn-confirm.yes:hover { background: rgba(34,197,94,0.25); }
     .btn-confirm.no {
-      background: rgba(255,255,255,0.05);
+      background: var(--hover-bg);
       border: 1px solid var(--border2);
       color: var(--muted);
     }
-    .btn-confirm.no:hover { color: var(--text); border-color: rgba(255,255,255,0.25); }
+    .btn-confirm.no:hover { color: var(--text); border-color: var(--hover-border); }
     .btn-confirm:disabled { opacity: 0.4; cursor: not-allowed; }
 
     /* Status chip */
@@ -282,7 +363,7 @@
     .status-chip.pending  { background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.25); color: var(--amber); }
     .status-chip.approved { background: rgba(34,197,94,0.12);  border: 1px solid rgba(34,197,94,0.25);  color: var(--green); }
     .status-chip.rejected { background: rgba(239,68,68,0.12);  border: 1px solid rgba(239,68,68,0.25);  color: var(--red);   }
-    .status-chip.done     { background: rgba(108,99,255,0.12); border: 1px solid rgba(108,99,255,0.25); color: #a5b4fc;      }
+    .status-chip.done     { background: rgba(108,99,255,0.12); border: 1px solid rgba(108,99,255,0.25); color: var(--accent-text);      }
     .status-chip .chip-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
 
     /* Chat input */
@@ -356,7 +437,7 @@
     }
 
     .activity-scroll::-webkit-scrollbar { width: 3px; }
-    .activity-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+    .activity-scroll::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 2px; }
 
     .activity-empty {
       display: flex;
@@ -383,12 +464,12 @@
       animation: fadeSlideIn 0.3s ease;
     }
 
-    .activity-item.ok      { background: rgba(34,197,94,0.06);  color: #86efac; }
-    .activity-item.fail    { background: rgba(239,68,68,0.06);  color: #fca5a5; }
-    .activity-item.working { background: rgba(59,130,246,0.06); color: #93c5fd; }
-    .activity-item.info    { background: rgba(255,255,255,0.04); color: var(--muted); }
-    .activity-item.rec     { background: rgba(108,99,255,0.08); color: #a5b4fc; }
-    .activity-item.waiting { background: rgba(245,158,11,0.06); color: #fde68a; }
+    .activity-item.ok      { background: rgba(34,197,94,0.06);  color: var(--ok-text); }
+    .activity-item.fail    { background: rgba(239,68,68,0.06);  color: var(--fail-text); }
+    .activity-item.working { background: rgba(59,130,246,0.06); color: var(--info-text); }
+    .activity-item.info    { background: var(--hover-bg); color: var(--muted); }
+    .activity-item.rec     { background: rgba(108,99,255,0.08); color: var(--accent-text); }
+    .activity-item.waiting { background: rgba(245,158,11,0.06); color: var(--warn-text); }
     .activity-item.done    { background: rgba(34,197,94,0.1);   color: var(--green); font-weight: 600; }
 
     .activity-icon { flex-shrink: 0; font-size: 13px; margin-top: 1px; }
@@ -428,6 +509,18 @@
       box-shadow: 0 0 6px var(--amber);
     }
 
+    .approval-pager {
+      display: flex; align-items: center; justify-content: space-between;
+      margin: -4px 0 12px; font-size: 12px;
+    }
+    .pager-count { font-weight: 700; color: var(--text); }
+    .pager-btn {
+      background: transparent; border: 1px solid var(--border2); color: var(--text);
+      border-radius: 6px; padding: 3px 10px; font-size: 12px; font-weight: 600; cursor: pointer;
+    }
+    .pager-btn:hover:not(:disabled) { background: var(--hover-bg); border-color: var(--hover-border); }
+    .pager-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
     .approval-row {
       display: flex;
       justify-content: space-between;
@@ -454,7 +547,7 @@
 
     .approval-reason {
       font-size: 12px;
-      color: #94a3b8;
+      color: var(--soft-text);
       font-style: italic;
       margin-top: 6px;
       line-height: 1.5;
@@ -503,7 +596,7 @@
     }
     .confirmation-banner .banner-title {
       font-weight: 700;
-      color: #a5b4fc;
+      color: var(--accent-text);
       font-size: 12px;
       text-transform: uppercase;
       letter-spacing: 0.05em;
@@ -563,41 +656,49 @@
     .nav-tab.active { color: var(--text); background: rgba(108,99,255,0.16); border-color: var(--accent); }
 
     /* ─── Team Calendar ─────────────────────────────────────────────────── */
-    .calendar-view { padding: 20px 28px; height: calc(100vh - 56px); overflow-y: auto; }
+    .calendar-view { padding: 20px 20px 32px; height: calc(100vh - 56px); overflow-y: auto; }
     .cal-toolbar { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
-    .cal-title { font-size: 18px; margin: 0; min-width: 220px; text-align: center; }
+    .cal-title { font-size: 20px; margin: 0; min-width: 220px; text-align: center; }
     .cal-nav {
-      background: var(--panel); border: 1px solid var(--border); color: var(--text);
-      width: 34px; height: 34px; border-radius: 8px; cursor: pointer; font-size: 18px;
+      background: var(--panel); border: 1px solid var(--border2); color: var(--text);
+      width: 36px; height: 36px; border-radius: 8px; cursor: pointer; font-size: 18px;
     }
     .cal-nav:hover { background: rgba(108,99,255,0.14); }
-    .cal-legend { display: flex; gap: 16px; margin-left: auto; font-size: 12px; color: var(--muted); }
+    .cal-legend { display: flex; gap: 16px; margin-left: auto; font-size: 13px; color: var(--muted); }
     .cal-legend .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: middle; }
+    .dot.off { background: var(--neutral-bg); border: 1px solid var(--border2); }
     .dot.ok { background: #22c55e; } .dot.atmin { background: #f59e0b; } .dot.short { background: #ef4444; }
 
-    .cal-team { margin-bottom: 26px; }
-    .cal-team-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
-    .cal-team-head h3 { margin: 0; font-size: 15px; }
-    .cal-team-head .meta { color: var(--muted); font-size: 12px; }
+    .cal-team { margin-bottom: 30px; }
+    .cal-team-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+    .cal-team-head h3 { margin: 0; font-size: 16px; }
+    .cal-team-head .meta { color: var(--muted); font-size: 13px; }
 
-    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
-    .cal-dow { text-align: center; font-size: 11px; color: var(--muted); padding: 4px 0; }
+    /* minmax(0,1fr) lets all 7 columns share the full width equally */
+    .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; width: 100%; }
+    .cal-dow { text-align: center; font-size: 12px; font-weight: 600; color: var(--muted); padding: 6px 0; }
     .cal-cell {
-      min-height: 74px; border: 1px solid var(--border); border-radius: 8px; padding: 5px 6px;
-      background: var(--panel); position: relative; overflow: hidden;
+      min-height: 120px; border: 1px solid var(--border2); border-radius: 10px; padding: 8px 10px 24px;
+      background: var(--cell-bg); position: relative;
     }
-    .cal-cell.empty { background: transparent; border: none; }
-    .cal-cell.ok    { border-left: 3px solid #22c55e; }
-    .cal-cell.atmin { border-left: 3px solid #f59e0b; background: rgba(245,158,11,0.05); }
-    .cal-cell.short { border-left: 3px solid #ef4444; background: rgba(239,68,68,0.07); }
-    .cal-daynum { font-size: 11px; color: var(--muted); margin-bottom: 3px; }
+    .cal-cell.empty { background: var(--cell-empty); border: 1px dashed var(--border); }
+    .cal-cell.ok    { border-left: 4px solid #22c55e; }
+    .cal-cell.atmin { border-left: 4px solid #f59e0b; background: rgba(245,158,11,0.10); }
+    .cal-cell.short { border-left: 4px solid #ef4444; background: rgba(239,68,68,0.10); }
+    .cal-cell.nonworking { background: var(--cell-empty); border: 1px dashed var(--border2); }
+    .cal-cell.nonworking .cal-daynum { opacity: 0.45; }
+    .cal-offlabel { font-size: 11px; color: var(--muted); }
+    .cal-duty { position: absolute; left: 10px; bottom: 6px; font-size: 11px; font-weight: 700; }
+    .cal-duty.ok { color: var(--ok-text); } .cal-duty.atmin { color: var(--warn-text); } .cal-duty.short { color: var(--fail-text); }
+    .cal-cell.today { box-shadow: 0 0 0 2px var(--accent); }
+    .cal-daynum { font-size: 13px; font-weight: 600; color: var(--text); opacity: 0.75; margin-bottom: 6px; }
     .cal-chip {
-      font-size: 10px; line-height: 1.3; border-radius: 4px; padding: 1px 4px; margin-bottom: 2px;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      font-size: 12px; line-height: 1.35; border-radius: 5px; padding: 3px 8px; margin-bottom: 4px;
+      overflow-wrap: anywhere;
     }
-    .cal-chip.self    { background: rgba(108,99,255,0.25); color: #c7d2fe; font-weight: 600; }
-    .cal-chip.pending { background: rgba(245,158,11,0.18); color: #fde68a; }
-    .cal-chip.approved{ background: rgba(34,197,94,0.16); color: #86efac; }
+    .cal-chip.self    { background: rgba(108,99,255,0.25); color: var(--chip-self-text); font-weight: 600; }
+    .cal-chip.pending { background: rgba(245,158,11,0.20); color: var(--warn-text); }
+    .cal-chip.approved{ background: rgba(34,197,94,0.18); color: var(--ok-text); }
     .cal-loading { color: var(--muted); padding: 40px; text-align: center; }
 
     /* ─── Responsive ────────────────────────────────────────────────────── */
@@ -622,6 +723,7 @@
     </div>
     <div class="nav-right">
       <span class="badge-nav" id="userBadge">…</span>
+      <button class="btn-reset" id="themeToggle" onclick="toggleTheme()" aria-label="Switch between light and dark mode" title="Switch theme">☀️ Light</button>
       <button class="btn-reset" onclick="resetDemo()">↺ Reset Demo</button>
       <button class="btn-reset" onclick="logout()">Log out</button>
     </div>
@@ -652,11 +754,7 @@
       </div>
 
       <!-- Quick prompt suggestions -->
-      <div class="quick-prompts" id="quickPrompts">
-        <button class="quick-btn" onclick="sendQuick(this)">I need 3 days off around mid-Oct for my child's school event, but I don't want to affect the project</button>
-        <button class="quick-btn" onclick="sendQuick(this)">What's my leave balance?</button>
-        <button class="quick-btn" onclick="sendQuick(this)">Am I eligible for Childcare Leave?</button>
-      </div>
+      <div class="quick-prompts" id="quickPrompts" aria-label="Suggested questions"></div>
 
       <!-- Input -->
       <div class="chat-input-area">
@@ -695,6 +793,11 @@
       <div class="approval-section" id="approvalSection">
         <div class="approval-card">
           <div class="approval-title">Manager Approval Required</div>
+          <div class="approval-pager" id="aprPager">
+            <button class="pager-btn" id="aprPrev" onclick="stepApproval(-1)" aria-label="Previous ticket">‹ Prev</button>
+            <span class="pager-count" id="aprCount" aria-live="polite">1 of 1</span>
+            <button class="pager-btn" id="aprNext" onclick="stepApproval(1)" aria-label="Next ticket">Next ›</button>
+          </div>
 
           <div class="approval-row">
             <span class="approval-label">Employee</span>
@@ -713,20 +816,15 @@
             <span class="approval-value" id="apr-days">—</span>
           </div>
           <div class="approval-row">
-            <span class="approval-label">Balance After</span>
-            <span class="approval-value" id="apr-balance">—</span>
+            <span class="approval-label">Reference</span>
+            <span class="approval-value" id="apr-ref">—</span>
           </div>
 
           <div class="approval-divider"></div>
 
           <div class="approval-row" style="align-items:flex-start;">
-            <span class="approval-label">Original Conflict</span>
-            <span class="approval-value" id="apr-conflicts">—</span>
-          </div>
-
-          <div class="approval-row" style="margin-top:6px; align-items:flex-start;">
-            <span class="approval-label">Rationale</span>
-            <span class="approval-value" id="apr-rationale" style="font-weight:400; color:#94a3b8; font-size:12px;">—</span>
+            <span class="approval-label">Reason</span>
+            <span class="approval-value" id="apr-reason" style="font-weight:400; color:var(--soft-text); font-size:12px;">—</span>
           </div>
 
           <div class="approval-buttons">
@@ -745,9 +843,11 @@
       <h2 class="cal-title" id="calTitle">—</h2>
       <button class="cal-nav" onclick="calNextMonth()">›</button>
       <div class="cal-legend">
-        <span><i class="dot ok"></i> OK</span>
-        <span><i class="dot atmin"></i> At minimum</span>
-        <span><i class="dot short"></i> Short</span>
+        <span title="More people on duty than the team minimum"><i class="dot ok"></i> OK (enough cover)</span>
+        <span title="Exactly the team minimum on duty"><i class="dot atmin"></i> At minimum</span>
+        <span title="Fewer than the team minimum on duty"><i class="dot short"></i> Short (below minimum)</span>
+        <span title="No cover rule applies"><i class="dot off"></i> Weekend / public holiday</span>
+        <span title="Leave not yet approved by the manager">(P) = pending approval</span>
       </div>
     </div>
     <div class="cal-body" id="calBody">
@@ -795,7 +895,6 @@
     function sendQuick(btn) {
       const input = document.getElementById('chatInput');
       input.value = btn.textContent;
-      document.getElementById('quickPrompts').style.display = 'none';
       sendMessage();
     }
 
@@ -903,6 +1002,21 @@
       window.location.href = 'login.html';
     }
 
+    // ─── Theme (light / dark) ────────────────────────────────────────────────
+    function applyTheme(t) {
+      document.documentElement.setAttribute('data-theme', t);
+      localStorage.setItem('leave_theme', t);
+      const btn = document.getElementById('themeToggle');
+      // The label names the mode you will switch TO.
+      if (btn) btn.textContent = t === 'light' ? '🌙 Dark' : '☀️ Light';
+    }
+    function toggleTheme() {
+      const cur = document.documentElement.getAttribute('data-theme') || 'dark';
+      applyTheme(cur === 'light' ? 'dark' : 'light');
+    }
+    window.addEventListener('DOMContentLoaded', () =>
+      applyTheme(document.documentElement.getAttribute('data-theme') || 'dark'));
+
     // ─── View switching (Chat ↔ Team Calendar) ───────────────────────────────
     function showView(view) {
       const isCal = view === 'calendar';
@@ -958,7 +1072,9 @@
           let d = new Date(e.start_date + 'T00:00:00');
           const end = new Date(e.end_date + 'T00:00:00');
           while (d <= end) {
-            const iso = d.toISOString().slice(0, 10);
+            // Format from local parts: toISOString() converts to UTC and
+            // shifts every chip one day early in timezones ahead of UTC (e.g. SGT).
+            const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
             (byDay[iso] = byDay[iso] || []).push(e);
             d.setDate(d.getDate() + 1);
           }
@@ -975,16 +1091,29 @@
 
         for (let day = 1; day <= daysInMonth; day++) {
           const iso = `${data.year}-${String(data.month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-          const status = (team.day_status && team.day_status[iso]) || 'ok';
-          const entries = byDay[iso] || [];
+          const status = (team.day_status && team.day_status[iso]) || 'OK';
+          const working = status !== 'NON_WORKING';
+          const cls = status.toLowerCase().replace('_', '');   // ok | atmin | short | nonworking
+          const onDuty = team.day_on_duty && team.day_on_duty[iso];
           let chips = '';
-          for (const e of entries) {
-            const cls = e.is_self ? 'self' : (e.status === 'Approved' ? 'approved' : 'pending');
-            const label = e.is_self ? `You · ${e.leave_type}` : `${e.name.split(' ')[0]} · ${e.leave_type}`;
-            chips += `<div class="cal-chip ${cls}" title="${escHtml(e.name)} — ${escHtml(e.leave_type_name)} (${e.status})">${escHtml(label)}</div>`;
+          // Leave chips and coverage only apply to working days.
+          for (const e of (working ? (byDay[iso] || []) : [])) {
+            const kind = e.is_self ? 'self' : (e.status === 'Approved' ? 'approved' : 'pending');
+            const who = e.is_self ? 'You' : e.name.split(' ')[0];
+            const pend = e.status === 'Approved' ? '' : ' (P)';
+            chips += `<div class="cal-chip ${kind}" title="${escHtml(e.name)} — ${escHtml(e.leave_type_name)} (${e.status})">${escHtml(who + ' · ' + e.leave_type + pend)}</div>`;
           }
-          html += `<div class="cal-cell ${status.toLowerCase()}">
-            <div class="cal-daynum">${day}</div>${chips}</div>`;
+          let foot = '';
+          if (working && onDuty !== undefined) {
+            const icon = { ok: '✓ OK', atmin: '▲ AT MIN', short: '⚠ SHORT' }[cls] || '';
+            foot = `<div class="cal-duty ${cls}">${icon} ${onDuty}/${team.headcount}</div>`;
+          } else if (!working) {
+            const lbl = (team.day_label && team.day_label[iso]) || '';
+            foot = lbl && lbl !== 'Weekend' ? `<div class="cal-offlabel">${escHtml(lbl)}</div>` : '';
+          }
+          const isToday = iso === new Date().toLocaleDateString('en-CA') ? ' today' : '';
+          html += `<div class="cal-cell ${cls}${isToday}">
+            <div class="cal-daynum">${day}</div>${chips}${foot}</div>`;
         }
         html += `</div></div>`;
       }
@@ -1030,12 +1159,75 @@
       renderedActivity = events.length;
     }
 
-    // Render markdown-ish reply (bold + newlines) safely.
-    function renderReply(text) {
-      let html = escHtml(text)
+    // Render a Markdown reply as safe HTML. All text is HTML-escaped FIRST, then
+    // a small subset is converted: tables, headings, bullet/numbered lists,
+    // **bold**, *italic*, `code` and line breaks. No raw HTML from the model is
+    // ever inserted.
+    function renderInline(t) {
+      return t
+        .replace(/`([^`\n]+)`/g, '<code>$1</code>')
         .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-        .replace(/\n/g, '<br>');
-      return html;
+        .replace(/(^|[^*\w])\*(?!\s)([^*\n]+?)\*(?![*\w])/g, '$1<em>$2</em>');
+    }
+
+    const TABLE_SEP = /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/;
+    const splitRow = (line) => line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => c.trim());
+
+    function renderTable(rows) {
+      const head = splitRow(rows[0]);
+      const aligns = splitRow(rows[1]).map(c =>
+        /^:-+:$/.test(c) ? 'center' : /-+:$/.test(c) ? 'right' : 'left');
+      const cell = (tag, c, i) =>
+        `<${tag} style="text-align:${aligns[i] || 'left'}">${renderInline(c)}</${tag}>`;
+      let html = '<div class="md-table-wrap"><table class="md-table"><thead><tr>' +
+        head.map((c, i) => cell('th', c, i)).join('') + '</tr></thead><tbody>';
+      for (const r of rows.slice(2)) {
+        const cells = splitRow(r);
+        html += '<tr>' + head.map((_, i) => cell('td', cells[i] || '', i)).join('') + '</tr>';
+      }
+      return html + '</tbody></table></div>';
+    }
+
+    function renderReply(text) {
+      const lines = escHtml(text || '').split('\n');
+      const out = [];
+      let para = [];
+      const flushPara = () => { if (para.length) { out.push('<p>' + para.join('<br>') + '</p>'); para = []; } };
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+
+        // Table: a row with pipes followed by a |---|---| separator line.
+        if (line.includes('|') && i + 1 < lines.length && TABLE_SEP.test(lines[i + 1]) && lines[i + 1].includes('-')) {
+          flushPara();
+          const rows = [line, lines[i + 1]];
+          i += 2;
+          while (i < lines.length && lines[i].includes('|') && lines[i].trim() !== '') rows.push(lines[i++]);
+          i--;
+          out.push(renderTable(rows));
+          continue;
+        }
+        // Lists
+        if (/^\s*([-*•])\s+/.test(line) || /^\s*\d+[.)]\s+/.test(line)) {
+          flushPara();
+          const ordered = /^\s*\d+[.)]\s+/.test(line);
+          const item = ordered ? /^\s*\d+[.)]\s+/ : /^\s*([-*•])\s+/;
+          const items = [];
+          while (i < lines.length && item.test(lines[i])) items.push(lines[i++].replace(item, ''));
+          i--;
+          const tag = ordered ? 'ol' : 'ul';
+          out.push(`<${tag}>` + items.map(t => `<li>${renderInline(t)}</li>`).join('') + `</${tag}>`);
+          continue;
+        }
+        // Headings
+        const h = line.match(/^\s*#{1,4}\s+(.*)$/);
+        if (h) { flushPara(); out.push(`<div class="md-h">${renderInline(h[1])}</div>`); continue; }
+        // Blank line ends a paragraph
+        if (line.trim() === '') { flushPara(); continue; }
+        para.push(renderInline(line));
+      }
+      flushPara();
+      return out.join('');
     }
 
     // --- Override: send a chat message to the backend ------------------------
@@ -1061,12 +1253,13 @@
         const data = await res.json();
         renderActivity(data.activity);
         appendAgentMessage(renderReply(data.reply || ''));
+        renderSuggestions(data.suggestions);
 
         const st = data.state || {};
         appState.status = st.approval_status || appState.status;
-        if (st.approval_status === 'PENDING_MANAGER_APPROVAL') {
-          await showApprovalCardFromBackend(st.reference_id);
-        }
+        // The approval card is for the approver only; it is driven by the
+        // server's per-user pending list, not by the requester's own chat.
+        await refreshPendingApprovals();
       } catch (err) {
         removeTyping();
         appendAgentMessage(
@@ -1078,31 +1271,93 @@
       }
     }
 
-    // --- Populate the manager approval card from backend data ----------------
-    async function showApprovalCardFromBackend(refId) {
-      try {
-        const res = await authFetch('/api/session-state');
-        const st = await res.json();
-        document.getElementById('apr-dates').textContent = refId || st.reference_id || '—';
-        document.getElementById('apr-type').textContent = 'Pending request';
-        document.getElementById('apr-employee').textContent = st.user_id || '—';
-        document.getElementById('apr-days').textContent = '—';
-        document.getElementById('apr-balance').textContent = '—';
-        document.getElementById('apr-conflicts').textContent =
-          'Surfaced during planning (see Agent Activity).';
-        document.getElementById('apr-rationale').textContent =
-          'Recommended by the agent after coverage and project checks.';
-      } catch (e) { /* non-fatal */ }
-      document.getElementById('approvalSection').classList.add('visible');
+    // --- Dynamic suggestion chips (driven by the user's earlier queries) -------
+    const FALLBACK_SUGGESTIONS = [
+      "What's my leave balance?",
+      'Am I eligible for Childcare Leave?',
+      'Plan 3 days off next week without affecting my team',
+    ];
+
+    function renderSuggestions(list) {
+      const box = document.getElementById('quickPrompts');
+      box.innerHTML = '';
+      for (const text of (list && list.length ? list : FALLBACK_SUGGESTIONS)) {
+        const b = document.createElement('button');
+        b.className = 'quick-btn';
+        b.type = 'button';
+        b.textContent = text;              // textContent: never interpreted as HTML
+        b.onclick = () => sendQuick(b);
+        box.appendChild(b);
+      }
     }
 
-    // --- Resolve a live approval token from the backend ----------------------
-    async function fetchApprovalToken(action) {
-      // The backend exposes tokens through session-state for the demo UI path.
-      const res = await authFetch('/api/session-state');
-      const st = await res.json();
-      return { refId: st.reference_id, action };
+    async function loadSuggestions() {
+      try {
+        const res = await authFetch('/api/suggestions');
+        renderSuggestions((await res.json()).suggestions);
+      } catch (e) { renderSuggestions(null); }
     }
+
+    window.addEventListener('DOMContentLoaded', loadSuggestions);
+
+    // --- Manager approval card: only shown to the assigned approver ----------
+    let currentApprovalId = null;
+    let pendingList = [];       // every ticket awaiting this user's decision
+    let pendingIdx = 0;         // which one the card is showing
+    let deciding = false;       // true while an approve/reject call is in flight
+
+    function renderApprovalCard() {
+      const section = document.getElementById('approvalSection');
+      if (!pendingList.length) {
+        currentApprovalId = null;
+        section.classList.remove('visible');
+        return;
+      }
+      pendingIdx = Math.min(Math.max(pendingIdx, 0), pendingList.length - 1);
+      const p = pendingList[pendingIdx];
+      currentApprovalId = p.employee_time_id;
+      document.getElementById('apr-employee').textContent = p.employee_name;
+      document.getElementById('apr-type').textContent = p.leave_type;
+      document.getElementById('apr-dates').textContent = p.date_label;
+      document.getElementById('apr-days').textContent = p.working_days;
+      document.getElementById('apr-ref').textContent = p.employee_time_id;
+      document.getElementById('apr-reason').textContent = p.reason || '—';
+      document.getElementById('aprCount').textContent = `${pendingIdx + 1} of ${pendingList.length}`;
+      const multi = pendingList.length > 1;
+      document.getElementById('aprPrev').disabled = !multi;
+      document.getElementById('aprNext').disabled = !multi;
+      for (const id of ['btnApprove', 'btnReject']) {
+        document.getElementById(id).disabled = deciding;   // locked only mid-request
+      }
+      section.classList.add('visible');
+    }
+
+    // Move to the next / previous ticket (wraps around).
+    function stepApproval(delta) {
+      if (pendingList.length < 2) return;
+      pendingIdx = (pendingIdx + delta + pendingList.length) % pendingList.length;
+      renderApprovalCard();
+    }
+
+    async function refreshPendingApprovals() {
+      try {
+        const res = await authFetch('/api/pending-approvals');
+        const { pending } = await res.json();
+        // Only tickets awaiting THIS user's decision, newest first.
+        const list = (pending || []).slice().reverse();
+        // Stay on the ticket being viewed if it is still pending; otherwise keep
+        // the same position so the next ticket slides into view after a decision.
+        const keep = list.findIndex(t => t.employee_time_id === currentApprovalId);
+        if (keep >= 0) pendingIdx = keep;
+        pendingList = list;
+        renderApprovalCard();
+      } catch (e) { /* non-fatal; authFetch handles 401 */ }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      refreshPendingApprovals();
+      setInterval(refreshPendingApprovals, 10000);
+    });
 
     // --- Override: manager approves via the backend --------------------------
     async function managerApprove() {
@@ -1118,21 +1373,24 @@
     }
 
     async function callApproval(action) {
+      deciding = true;
       try {
-        // The UI card uses the dedicated UI-decision endpoint keyed by reference id.
         const res = await authFetch('/api/ui-approval', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action }),
+          body: JSON.stringify({ action, employee_time_id: currentApprovalId }),
         });
         const data = await res.json();
         renderActivity((await (await authFetch('/api/session-state')).json()).activity);
         if (data.success) {
+          const ref = `<span class="ref-id">${escHtml(data.employee_time_id || '')}</span>`;
+          const mail = data.employee_emailed
+            ? 'The employee has been notified by email.'
+            : 'The employee could not be notified by email.';
           if (action === 'approve') {
-            appendAgentMessage(`Your leave was <strong>approved</strong>. Reference ` +
-              `<span class="ref-id">${escHtml(data.employee_time_id || '')}</span>. A confirmation email has been sent.`);
+            appendAgentMessage(`You <strong>approved</strong> ${ref}. ${mail}`);
           } else {
-            appendAgentMessage(`The request was <strong>rejected</strong>. No leave balance was deducted.`);
+            appendAgentMessage(`You <strong>rejected</strong> ${ref}. No leave balance was deducted. ${mail}`);
           }
         } else {
           appendAgentMessage(`⚠ ${escHtml(data.message || 'Could not process the decision.')}`);
@@ -1140,17 +1398,25 @@
       } catch (err) {
         appendAgentMessage(`⚠ Couldn't reach the backend to record the decision.`);
       } finally {
-        document.getElementById('approvalSection').classList.remove('visible');
+        deciding = false;
+        await refreshPendingApprovals();
         lockInput(false);
       }
     }
 
-    // --- Override: reset clears backend session too --------------------------
-    const _mockReset = resetDemo;
+    // --- Reset: clear the backend session and the chat UI ----------------------
+    const GREETING_HTML = document.getElementById('messages').innerHTML;
     async function resetDemo() {
       renderedActivity = 0;
       try { await authFetch('/api/reset', { method: 'POST' }); } catch (e) { /* ignore */ }
-      _mockReset();
+      document.getElementById('messages').innerHTML = GREETING_HTML;
+      const log = document.getElementById('activityLog');
+      const empty = document.getElementById('activityEmpty');   // grab before clearing
+      log.innerHTML = '';
+      if (empty) { empty.style.display = ''; log.appendChild(empty); }
+      lockInput(false);
+      await loadSuggestions();
+      await refreshPendingApprovals();
     }
   </script>
 

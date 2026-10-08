@@ -33,9 +33,9 @@ def test_redacts_other_employee_ids():
 def test_allows_own_and_manager_email():
     # E005's own email and E004 (manager) email, per 02_Job_Information.csv.
     out = filters.filter_output(
-        "chuaweiling@proton.me and marcuslim94@proton.me"
+        "chuaweiling1@outlook.com and marcuslim94@proton.me"
     )
-    assert "chuaweiling@proton.me" in out
+    assert "chuaweiling1@outlook.com" in out
     assert "marcuslim94@proton.me" in out
 
 

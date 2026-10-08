@@ -23,7 +23,7 @@ Sheets 1–16 are converted from `HR Orchestrator AI Agent.xlsx`. Each sheet is 
 | 17 | Dependents | [17_Dependents.csv](17_Dependents.csv) | 1 | dependent_id, user_id, name, date_of_birth, relationship |
 | 18 | Entitlement_Rules | [18_Entitlement_Rules.csv](18_Entitlement_Rules.csv) | 2 | rule_id, time_type_code, condition_field, condition_operator, condition_value, annual_quota_days, notes |
 | 19 | Project_Events | [19_Project_Events.csv](19_Project_Events.csv) | 2 | event_id, project_id, event_type, start_date, end_date, description |
-| 20 | Companies | [20_Companies.csv](20_Companies.csv) | 2 | company_id, company_name, contract_hr_email, time_profile_code, policy_file |
+| 20 | Companies | [20_Companies.csv](20_Companies.csv) | 3 | company_id, company_name, contract_hr_email, time_profile_code, policy_file |
 | 21 | Users | [21_Users.csv](21_Users.csv) | 3 | username, salt, password_hash, user_id, display_name |
 
 ## SF_Mapping
@@ -382,12 +382,12 @@ File: `19_Project_Events.csv`. Read by `get_project_events` (`backend/tools/team
 
 ## Companies
 
-File: `20_Companies.csv`. Used by `backend/tools/policy_rag.py` to pick which policy document in `policies/` applies to an employee (defaults to IBM).
-
+File: `20_Companies.csv`. Used by `backend/tools/policy_rag.py` to pick which policy document in `policies/` applies to an employee. The employee's `employer` (in `02_Job_Information.csv`) is matched to `company_name`; an employer with no `policy_file` has no policy on file and the assistant says so rather than using another employer's policy.
 | company_id | company_name | contract_hr_email | time_profile_code | policy_file |
 |---|---|---|---|---|
-| IBM | IBM Singapore | hr@i-be-yam.com | SG_STD | ibm_leave_policy.md |
-| ContractCo | ContractCo Pte Ltd | hr@contractco.example.com | SG_CONTRACT | contractco_leave_policy.md |
+| I_BE_YAM | I Be Yam | hr@i-be-yam.com | SG_STD | i_be_yam_leave_policy.md |
+| HE_BE_TOMATO | He Be Tomato | | SG_CONTRACT | he_be_tomato_leave_policy.md |
+| SHE_BE_A_PEAR | She Be A Pear | | | |
 
 ## Users
 

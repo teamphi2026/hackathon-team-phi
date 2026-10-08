@@ -26,6 +26,13 @@ def _deterministic_mode(monkeypatch):
     monkeypatch.setattr(config, "ICA_BASE_URL", "")
 
 
+@pytest.fixture(autouse=True)
+def _isolate_email_log(monkeypatch, tmp_path):
+    """Keep test runs out of the real logs/email_events.jsonl."""
+    from backend import tool_logger
+    monkeypatch.setattr(tool_logger, "EMAIL_LOG_FILE", tmp_path / "email_events.jsonl")
+
+
 @pytest.fixture
 def isolate_data(tmp_path):
     """Back up and restore the mutable CSVs around a test, pin session to E005."""

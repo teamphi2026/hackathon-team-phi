@@ -24,6 +24,7 @@ from .state import get_session
 
 LOG_DIR = REPO_ROOT / "logs"
 LOG_FILE = LOG_DIR / "tool_calls.jsonl"
+EMAIL_LOG_FILE = LOG_DIR / "email_events.jsonl"
 
 _MAX_FIELD = 800  # chars; truncate long arg/result previews
 _REDACT_KEYS = {"token", "password", "api_key", "smtp_password"}
@@ -51,13 +52,38 @@ def _redact_args(kwargs: dict[str, Any]) -> dict[str, Any]:
     return {k: ("<redacted>" if k.lower() in _REDACT_KEYS else v) for k, v in kwargs.items()}
 
 
-def _write_record(record: dict[str, Any]) -> None:
+def _write_record(record: dict[str, Any], path: Path | None = None) -> None:
     try:
         LOG_DIR.mkdir(parents=True, exist_ok=True)
-        with open(LOG_FILE, "a", encoding="utf-8") as fh:
+        with open(path or LOG_FILE, "a", encoding="utf-8") as fh:
             fh.write(json.dumps(record, default=str, ensure_ascii=False) + "\n")
     except Exception as exc:  # never let logging break a request
         logger.warning("failed to write tool-call log: %s", exc)
+
+
+email_logger = logging.getLogger("leave.email")
+if not email_logger.handlers:
+    _eh = logging.StreamHandler()
+    _eh.setFormatter(logging.Formatter("%(asctime)s [%(name)s] %(message)s"))
+    email_logger.addHandler(_eh)
+    email_logger.setLevel(logging.INFO)
+
+
+def log_email(event: str, detail: dict[str, Any], *, level: int = logging.INFO) -> None:
+    """Log an email lifecycle event to stderr and logs/email_events.jsonl.
+
+    `event` is one of: attempt, sent, dry_run, failed, skipped, tokens_issued.
+    Callers must never put passwords, approval tokens or message bodies in
+    `detail`; as a safety net, redacted keys are masked here too.
+    """
+    record = {
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "user": get_session().session_user_id,
+        "email_event": event,
+        **_redact_args(detail),
+    }
+    email_logger.log(level, "✉ email.%s %s", event, _safe(_redact_args(detail)))
+    _write_record(record, EMAIL_LOG_FILE)
 
 
 def log_intent(kind: str, detail: dict[str, Any]) -> None:

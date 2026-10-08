@@ -49,11 +49,11 @@ def test_logout_invalidates_token():
 
 
 def test_register_creates_user_mapped_to_employee():
-    result = auth.register("rahul", "pw", "E006")
+    result = auth.register("newhire", "pw", "E006")
     assert result["success"] is True
     assert result["user_id"] == "E006"
     # New user can log in.
-    login = auth.login("rahul", "pw")
+    login = auth.login("newhire", "pw")
     assert login["success"] is True
     assert login["user_id"] == "E006"
 

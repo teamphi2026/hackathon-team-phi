@@ -1,6 +1,4 @@
-# IBM Singapore — Leave Policy (Demo)
-
-> Illustrative policy for the hackathon demo. Not an official IBM document.
+# I Be Yam Pte Ltd — Leave Policy (Demo)
 
 ## Annual Leave
 Employees accrue Annual Leave (AL) monthly based on years of service: 0–3 years

@@ -74,6 +74,7 @@ def get_employee_profile() -> dict[str, Any]:
         "email": r["email"],
         "home_team_id": r["home_team_id"],
         "job_title": r["job_title"],
+        "employer": (r.get("employer", "") or "").strip() or None,   # legal employing entity
         "manager_id": r["manager_id"],
         "years_of_service": _to_num(r.get("years_of_service")),
         "teams": teams,
@@ -442,4 +443,20 @@ def validate_policy(
         "working_days": working_days,
         "remaining_after": remaining_after,
         "violations": violations,
+        # Authoritative weekday-labelled range. The model must quote this
+        # instead of working out weekdays itself (it gets them wrong).
+        "date_label": format_date_range(start, end),
     }
+
+
+def format_date_range(start: date, end: date) -> str:
+    """Human label with weekdays, e.g. 'Tuesday 13 – Thursday 15 October 2026'."""
+    def part(d: date, with_month: bool) -> str:
+        base = f"{d.strftime('%A')} {d.day}"
+        return f"{base} {d.strftime('%B %Y')}" if with_month else base
+
+    if start == end:
+        return part(start, True)
+    if (start.year, start.month) == (end.year, end.month):
+        return f"{part(start, False)} – {part(end, True)}"
+    return f"{part(start, True)} – {part(end, True)}"

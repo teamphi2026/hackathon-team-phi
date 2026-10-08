@@ -333,6 +333,13 @@ def get_team_calendar(year: int, month: int) -> dict[str, Any]:
 
     absences = _absences_in_range(start, end)
 
+    # Working-day rules come from the viewer's work schedule + holiday calendar.
+    profile = hr.get_employee_profile()
+    work_hours = hr._work_hours_by_dow(profile.get("work_schedule_code", "SG_STD"))
+    hol = _load("10_Holiday_Calendar.csv")
+    hol = hol[hol.holiday_calendar_code == profile.get("holiday_calendar_code", "SG")]
+    holiday_names = {_parse(r["date"]): r["holiday_name"] for _, r in hol.iterrows()}
+
     teams_out: list[dict[str, Any]] = []
     for team_id in _user_team_ids(uid):
         trow = teams_df[teams_df.team_id == team_id]
@@ -360,26 +367,43 @@ def get_team_calendar(year: int, month: int) -> dict[str, Any]:
                 }
             )
 
-        # Per-day coverage status across the month (for day colouring).
+        # Per-day coverage across the month (for day colouring).
+        # Rules (mirrors hr_data/15_Leave_Calendar.csv):
+        #   * only WORKING days are assessed; weekends and public holidays are
+        #     NON_WORKING (no coverage rule applies, nobody is "off")
+        #   * on_duty = headcount - DISTINCT people with an active request that
+        #     covers the day (two overlapping requests by one person count once)
+        #   * OK if on_duty > min, AT_MIN if == min, SHORT if < min
+        spans: list[tuple[str, date, date]] = []
+        for _, r in team_abs.iterrows():
+            try:
+                spans.append((r["user_id"], _parse(r["start_date"]), _parse(r["end_date"])))
+            except (ValueError, TypeError):
+                continue
+
         day_status: dict[str, str] = {}
+        day_on_duty: dict[str, int] = {}
+        day_type: dict[str, str] = {}
+        day_label: dict[str, str] = {}
         d = start
         while d <= end:
-            absent = 0
-            for _, r in team_abs.iterrows():
-                try:
-                    rs, re = _parse(r["start_date"]), _parse(r["end_date"])
-                except (ValueError, TypeError):
-                    continue
-                if rs <= d <= re:
-                    absent += 1
-            on_duty = headcount - absent
-            if on_duty > min_required:
-                status = "OK"
-            elif on_duty == min_required:
-                status = "AT_MIN"
+            key = d.isoformat()
+            if d in holiday_names:
+                day_type[key], day_label[key] = "HOLIDAY", holiday_names[d]
+                day_status[key] = "NON_WORKING"
+            elif work_hours[d.weekday()] <= 0:
+                day_type[key], day_label[key] = "WEEKEND", "Weekend"
+                day_status[key] = "NON_WORKING"
             else:
-                status = "SHORT"
-            day_status[d.isoformat()] = status
+                absent = {uid_ for uid_, rs, re in spans if rs <= d <= re}
+                on_duty = headcount - len(absent)
+                if on_duty > min_required:
+                    status = "OK"
+                elif on_duty == min_required:
+                    status = "AT_MIN"
+                else:
+                    status = "SHORT"
+                day_type[key], day_status[key], day_on_duty[key] = "WORKING", status, on_duty
             d += timedelta(days=1)
 
         teams_out.append(
@@ -390,6 +414,9 @@ def get_team_calendar(year: int, month: int) -> dict[str, Any]:
                 "min_required": min_required,
                 "entries": entries,
                 "day_status": day_status,
+                "day_on_duty": day_on_duty,
+                "day_type": day_type,
+                "day_label": day_label,
             }
         )
 

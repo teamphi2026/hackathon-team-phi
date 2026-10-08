@@ -9,16 +9,17 @@ Run with:
 from __future__ import annotations
 
 import asyncio
+import html
 import json
 
 from typing import Optional
 
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel
 
-from . import agent, auth, email_service
+from . import agent, auth, email_service, suggestions
 from .state import get_session
 from .tools import actions
 from .tools import team_project as tp
@@ -55,8 +56,11 @@ def _require_identity(authorization: str | None) -> str:
         raise HTTPException(status_code=401, detail="Not authenticated.")
     s = get_session()
     if s.session_user_id != user_id:
-        # Switching identity starts a clean session for that user.
+        # Switching identity starts a clean session for that user, but keep the
+        # outstanding email approval tokens so links already sent still work.
+        tokens = s.approval_token_map
         s.reset()
+        s.approval_token_map = tokens
         s.session_user_id = user_id
     return user_id
 
@@ -119,6 +123,25 @@ def chat(req: ChatRequest, authorization: Optional[str] = Header(default=None)) 
     return agent.handle_message(req.message)
 
 
+def _notify_employee(result: dict) -> dict:
+    """After a manager decision, email the employee and report whether it sent."""
+    if result.get("success"):
+        eid = result["employee_time_id"]
+        if result["action"] == "approve":
+            mail = email_service.send_confirmation_email(eid)
+        else:
+            mail = email_service.send_rejection_email(eid, reason="Rejected by manager")
+        result["employee_emailed"] = bool(mail.get("sent"))
+    return result
+
+
+@app.get("/api/suggestions")
+def get_suggestions(authorization: Optional[str] = Header(default=None)) -> dict:
+    """Dynamic follow-up chips for the chat box, based on this session's history."""
+    _require_identity(authorization)
+    return {"suggestions": suggestions.build(get_session())}
+
+
 @app.post("/api/approval/{token}")
 def approval(token: str, action: str = "approve") -> dict:
     """Manager Approve/Reject token callback.
@@ -126,38 +149,51 @@ def approval(token: str, action: str = "approve") -> dict:
     Applies the decision via the state machine, then emails the employee.
     """
     result = actions.handle_approval_token(token, action)
-    if result.get("success"):
-        eid = result["employee_time_id"]
-        if result["action"] == "approve":
-            email_service.send_confirmation_email(eid)
-        else:
-            email_service.send_rejection_email(eid, reason="Rejected by manager")
-    return result
+    return _notify_employee(result)
+
+
+@app.get("/api/approval/{token}", response_class=HTMLResponse)
+def approval_link(token: str, action: str = "approve") -> HTMLResponse:
+    """Landing page for the Approve/Reject links in the manager email.
+
+    Email clients open links with GET, so this applies the decision (tokens
+    are single-use) and shows a small confirmation page.
+    """
+    result = approval(token, action)
+    ok = bool(result.get("success"))
+    heading = "Done" if ok else "Could not process this link"
+    body = html.escape(result.get("message", ""))
+    return HTMLResponse(
+        f"<!doctype html><meta charset='utf-8'><title>Leave approval</title>"
+        f"<body style='font-family:sans-serif;max-width:480px;margin:15vh auto;text-align:center'>"
+        f"<h2>{heading}</h2><p>{body}</p></body>",
+        status_code=200 if ok else 400,
+    )
 
 
 class UIApproval(BaseModel):
     action: str
+    employee_time_id: str
+
+
+@app.get("/api/pending-approvals")
+def pending_approvals(authorization: Optional[str] = Header(default=None)) -> dict:
+    """Requests awaiting THIS user's decision. Empty for non-approvers, so the
+    approval card only ever shows on the manager's account."""
+    user_id = _require_identity(authorization)
+    return {"pending": actions.list_pending_for_approver(user_id)}
 
 
 @app.post("/api/ui-approval")
 def ui_approval(req: UIApproval, authorization: Optional[str] = Header(default=None)) -> dict:
     """Manager decision made in the UI card (not via an email token).
 
-    Acts on the session's current pending request. Mirrors the token path:
+    Only the request's assigned approver may decide. Mirrors the token path:
     applies the state transition then emails the employee.
     """
-    _require_identity(authorization)
-    s = get_session()
-    if not s.reference_id:
-        return {"success": False, "message": "No pending request to decide on."}
-    result = actions.handle_ui_decision(s.reference_id, req.action)
-    if result.get("success"):
-        eid = result["employee_time_id"]
-        if result["action"] == "approve":
-            email_service.send_confirmation_email(eid)
-        else:
-            email_service.send_rejection_email(eid, reason="Rejected by manager")
-    return result
+    user_id = _require_identity(authorization)
+    result = actions.handle_ui_decision(req.employee_time_id, req.action, approver_id=user_id)
+    return _notify_employee(result)
 
 
 @app.get("/api/team-calendar")

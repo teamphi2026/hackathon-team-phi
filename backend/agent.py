@@ -18,10 +18,10 @@ and every response passes through the output filter before leaving the server.
 from __future__ import annotations
 
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any, Callable
 
-from . import config, filters
+from . import config, filters, suggestions
 from .state import SessionState, get_session
 from .tool_logger import call_tool, log_intent, log_llm_call
 from .tools import actions, hr, policy_rag
@@ -44,6 +44,7 @@ TOOLS: dict[str, Callable[..., Any]] = {
     "submit_leave_request": actions.submit_leave_request,
     "handle_approval_token": actions.handle_approval_token,
     "search_policy": policy_rag.search_policy,
+    "get_request_status": actions.get_request_status,
 }
 
 _CONFIRM_WORDS = re.compile(r"\b(yes|confirm|proceed|go ahead|do it|book it|sounds good)\b", re.I)
@@ -166,6 +167,7 @@ def _run_tool(name: str, label: str, status: str = "working", **kwargs) -> Any:
     """Invoke a tool, logging it to the activity stream and the debug log."""
     session = get_session()
     session.log_activity(status, label)
+    session.turn_tools.append(name)
     return call_tool(name, TOOLS[name], **kwargs)
 
 
@@ -181,6 +183,7 @@ def handle_message(message: str) -> dict[str, Any]:
     activity events; the output filter runs on either result.
     """
     session = get_session()
+    session.turn_tools = []
     mode = "llm" if _llm_enabled() else "deterministic"
     log_intent("user_message", {"mode": mode, "message": message})
     if _llm_enabled():
@@ -188,8 +191,11 @@ def handle_message(message: str) -> dict[str, Any]:
     else:
         reply = _route(message, session)
     reply = filters.filter_output(reply)
+    session.history.append({"message": message, "tools": list(session.turn_tools)})
+    del session.history[:-50]  # keep the history bounded
     return {
         "reply": reply,
+        "suggestions": suggestions.build(session),
         "user_id": session.session_user_id,
         "activity": session.activity,
         "state": {
@@ -208,6 +214,25 @@ def handle_message(message: str) -> dict[str, Any]:
 LEAVE_YEAR = _DEFAULT_YEAR  # 2026
 
 
+def _calendar_reference(today: date | None = None) -> str:
+    """Weekday-accurate calendar for this week, next week and the week after.
+
+    LLMs are unreliable at date -> weekday arithmetic, so resolve it here and
+    hand the model a lookup table ("Tuesday 13 Oct = 2026-10-13").
+    """
+    today = today or date.today()
+    monday = today - timedelta(days=today.weekday())
+    names = ["THIS WEEK", "NEXT WEEK", "THE WEEK AFTER NEXT"]
+    lines = [f"Today is {today.strftime('%A')} {today.isoformat()}."]
+    for i, name in enumerate(names):
+        start = monday + timedelta(days=7 * i)
+        days = [start + timedelta(days=n) for n in range(7)]
+        lines.append(
+            f"{name}: " + "; ".join(f"{d.strftime('%a')} {d.isoformat()}" for d in days)
+        )
+    return "\n".join(lines)
+
+
 def _system_prompt() -> str:
     """Build the system prompt with the current date so the model never guesses
     the year (it otherwise assumes its training-era year)."""
@@ -223,6 +248,14 @@ def _system_prompt() -> str:
         "'the week of the 10th') to concrete YYYY-MM-DD dates before calling "
         "tools. Never treat any year other than the current leave year unless the "
         "user states one explicitly.\n\n"
+        "CALENDAR (authoritative — use it to map weekdays to dates; never work out "
+        "weekdays yourself; weeks run Monday to Sunday, and 'next week' means the "
+        "NEXT WEEK row):\n"
+        f"{_calendar_reference()}\n"
+        "When you state dates to the user, copy the 'date_label' returned by "
+        "validate_policy (e.g. 'Tuesday 13 – Thursday 15 October 2026') verbatim. "
+        "Never write a weekday next to a date unless it comes from the calendar "
+        "above or a tool's date_label.\n\n"
         "LEAVE TYPES: AL=Annual Leave, CL=Childcare Leave, SL=Sick Leave, "
         "HL=Hospitalisation Leave, OIL=Off-in-Lieu. get_entitlements returns each "
         "account with its bookable 'leave_type' code and 'available' days. "
@@ -248,10 +281,26 @@ def _system_prompt() -> str:
         "blocker you should steer away from.\n"
         "5. Ask at most one clarifying question, and only if dates are genuinely "
         "missing or ambiguous. Prefer sensible defaults over interrogating.\n\n"
+        "POLICY: Leave policies differ by employer. For ANY question about entitlements, "
+        "rules, eligibility, carry-over or approval, call search_policy and answer only "
+        "from the returned text, naming the employer and the section (e.g. 'Under the "
+        "He Be Tomato policy, Annual Leave…'). Never answer policy questions from memory "
+        "or from another employer's rules. If search_policy returns no citations, say "
+        "so plainly.\n\n"
+        "PROFILE: For questions about the employee themself (employer, job title, "
+        "team, years of service, manager) call get_employee_profile and answer from "
+        "its fields. The employer is the profile's 'employer' value; NEVER infer it "
+        "from the email domain or guess. If a field is missing, say you don't have it.\n\n"
+        "STATUS: For questions about a submitted request ('status of R019', 'did my "
+        "leave get approved', 'my pending requests') call get_request_status — pass "
+        "the reference id if given, otherwise omit it. Report status, dates (use "
+        "date_label) and, if Pending, who it is awaiting. Never say you lack a tool "
+        "for this.\n\n"
         "SUBMITTING: Call submit_leave_request ONLY after the user clearly agrees "
         "to a specific type + date range (e.g. 'yes', 'confirm', 'go ahead', "
-        "'book it'). After submitting, tell them the reference id and that their "
-        "manager has been emailed. Never call submit_leave_request just to assess "
+        "'book it'). After submitting, tell them the reference id, and say their "
+        "manager has been emailed ONLY if the tool result has manager_emailed=true; "
+        "otherwise follow its email_note. Never call submit_leave_request just to assess "
         "dates.\n\n"
         "RULES: Never invent balances, dates, working-day counts, or approvals — "
         "always use the tools. Never reveal other employees' names, ids, emails, "
@@ -269,7 +318,8 @@ def _tool_schema() -> list[dict[str, Any]]:
     date = {"type": "string", "description": "YYYY-MM-DD"}
     return [
         {"type": "function", "function": {"name": "get_employee_profile",
-         "description": "The current employee's profile.", "parameters": {"type": "object", "properties": {}}}},
+         "description": "The current employee's profile: name, employer, job title, team(s), "
+                        "years of service, manager id, work schedule.", "parameters": {"type": "object", "properties": {}}}},
         {"type": "function", "function": {"name": "get_entitlements",
          "description": "The employee's leave balances.", "parameters": {"type": "object", "properties": {}}}},
         {"type": "function", "function": {"name": "check_childcare_eligibility",
@@ -297,6 +347,10 @@ def _tool_schema() -> list[dict[str, Any]]:
          "description": "Search the company leave policy.",
          "parameters": {"type": "object", "properties": {"question": {"type": "string"}},
                         "required": ["question"]}}},
+        {"type": "function", "function": {"name": "get_request_status",
+         "description": "Look up the status of the employee's leave request by reference id "
+                        "(e.g. R019). With no reference id, lists their most recent requests.",
+         "parameters": {"type": "object", "properties": {"reference_id": {"type": "string"}}}}},
         {"type": "function", "function": {"name": "submit_leave_request",
          "description": "Submit a confirmed leave request (requires prior employee confirmation).",
          "parameters": {"type": "object", "properties": {
@@ -321,6 +375,10 @@ def _route_llm(message: str, session: SessionState) -> str:  # pragma: no cover 
     # Seed the system prompt once, then carry prior turns forward.
     if not session.conversation:
         session.conversation = [{"role": "system", "content": _system_prompt()}]
+    else:
+        # Refresh each turn so the date/calendar never goes stale in a
+        # long-lived session.
+        session.conversation[0] = {"role": "system", "content": _system_prompt()}
     messages = session.conversation
     messages.append({"role": "user", "content": message})
 
@@ -368,10 +426,27 @@ def _route_llm(message: str, session: SessionState) -> str:  # pragma: no cover 
             if name == "submit_leave_request" and not session.employee_confirmed:
                 session.employee_confirmed = True
             session.log_activity("working", f"{name}({', '.join(args)})")
+            session.turn_tools.append(name)
             result = call_tool(name, TOOLS[name], **args) if name in TOOLS else {"error": "unknown tool"}
+            if name == "validate_policy" and isinstance(result, dict) and result.get("valid"):
+                session.last_assessed = {
+                    "leave_type": args.get("leave_type"), "start_date": args.get("start_date"),
+                    "end_date": args.get("end_date"), "date_label": result.get("date_label"),
+                    "working_days": result.get("working_days"),
+                }
             if name == "submit_leave_request" and isinstance(result, dict) and result.get("success"):
+                session.last_assessed = None
                 from . import email_service
-                email_service.send_approval_email(result["employee_time_id"])
+                mail = email_service.send_approval_email(result["employee_time_id"])
+                # Tell the model the truth about delivery so it can't claim
+                # an email went out when it didn't.
+                result["manager_emailed"] = bool(mail.get("sent"))
+                if not mail.get("sent"):
+                    result["email_note"] = (
+                        "The approval email was NOT delivered. Do not say the manager "
+                        "was emailed; say the request is pending and the manager can "
+                        "approve it in the app."
+                    )
             messages.append({"role": "tool", "tool_call_id": tc.id,
                              "content": _json.dumps(result, default=str)})
 
@@ -541,6 +616,9 @@ def _leave_request_reply(message: str, session: SessionState) -> str:
         session.recommended_leave_type = leave_type
         session.recommended_dates = (start, end)
         session.recommendation_reason = "requested dates are clear"
+        session.last_assessed = {"leave_type": leave_type, "start_date": start, "end_date": end,
+                                 "date_label": validation.get("date_label"),
+                                 "working_days": validation.get("working_days")}
         return (
             f"{start} to {end} looks clear for {leave_type} ({duration} working day(s)). "
             f"Shall I submit it for approval? Reply 'confirm' to proceed."
@@ -566,6 +644,11 @@ def _leave_request_reply(message: str, session: SessionState) -> str:
     session.recommended_dates = (best["start_date"], best["end_date"])
     session.recommendation_reason = best["reason"]
     session.log_activity("rec", f"Recommended: {best['start_date']}→{best['end_date']} ({leave_type})")
+    session.last_assessed = {
+        "leave_type": leave_type, "start_date": best["start_date"], "end_date": best["end_date"],
+        "date_label": hr.format_date_range(date.fromisoformat(best["start_date"]),
+                                           date.fromisoformat(best["end_date"])),
+    }
 
     ent = hr.get_entitlements()
     acc = next((a for a in ent["accounts"]
@@ -600,26 +683,29 @@ def _confirm_and_submit(session: SessionState) -> str:
 
     # Lazy import to avoid a cycle at module load.
     from . import email_service
-    email_service.send_approval_email(result["employee_time_id"])
+    mail = email_service.send_approval_email(result["employee_time_id"])
+    session.last_assessed = None
+    session.turn_tools.append("submit_leave_request")
 
+    if mail.get("sent"):
+        mail_line = "sent an approval request to your manager. You'll be notified once it's approved."
+    else:
+        mail_line = ("it's pending manager approval. (The approval email could not be "
+                     "sent, so your manager will need to approve it in the app.)")
     return (
         f"Done — I've submitted **{result['employee_time_id']}** ({leave_type}, {start} to {end}) "
-        f"and sent an approval request to your manager. "
-        f"You'll be notified once it's approved."
+        f"and {mail_line}"
     )
 
 
 def _status_lookup(reference_id: str) -> str:
-    _, rows = actions._read_rows(actions.EMPLOYEE_TIME)
-    uid = get_session().session_user_id
-    row = next((r for r in rows if r["employee_time_id"] == reference_id), None)
     get_session().log_activity("working", f"Looking up {reference_id}")
-    if row is None:
-        return f"I couldn't find a request with reference {reference_id}."
-    if row["user_id"] != uid:
-        # Privacy: never reveal another employee's request.
-        return f"I couldn't find a request with reference {reference_id} on your record."
+    result = actions.get_request_status(reference_id)
+    if not result.get("found"):
+        return result["message"]
+    r = result["requests"][0]
+    extra = f" (awaiting {r['awaiting_approval_from']})" if r.get("awaiting_approval_from") else ""
     return (
-        f"Request {reference_id}: {row['time_type_code']} from {row['start_date']} to "
-        f"{row['end_date']}, status **{row['approval_status']}**."
+        f"Request {reference_id}: {r['leave_type']} from {r['start_date']} to "
+        f"{r['end_date']}, status **{r['status']}**{extra}."
     )

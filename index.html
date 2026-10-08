@@ -1160,5 +1160,166 @@
     }
   </script>
 
+  <!-- ─── Real backend integration (Task 10) ─────────────────────────────────
+       Overrides the mock handlers above to talk to the FastAPI backend.
+       Set API_BASE to the backend URL (defaults to same origin). If the
+       backend is unreachable the mock handlers remain as a fallback. -->
+  <script>
+    const API_BASE = (window.LEAVE_API_BASE || '').replace(/\/$/, '');
+    const api = (path) => `${API_BASE}${path}`;
+
+    // Icon per activity status emitted by the backend.
+    const ACTIVITY_ICON = {
+      ok: '✓', fail: '✗', working: '🔍', info: 'ℹ',
+      rec: '→', waiting: '⏸', done: '🎉', conflict: '✗'
+    };
+    const ACTIVITY_CLASS = {
+      ok: 'ok', fail: 'fail', working: 'working', info: 'info',
+      rec: 'rec', waiting: 'waiting', done: 'done', conflict: 'fail'
+    };
+
+    let renderedActivity = 0;
+
+    function renderActivity(events) {
+      if (!events) return;
+      const empty = document.getElementById('activityEmpty');
+      if (empty && events.length) empty.style.display = 'none';
+      const log = document.getElementById('activityLog');
+      for (let i = renderedActivity; i < events.length; i++) {
+        const ev = events[i];
+        const item = document.createElement('div');
+        item.className = `activity-item ${ACTIVITY_CLASS[ev.status] || 'info'}`;
+        item.innerHTML =
+          `<span class="activity-icon">${ACTIVITY_ICON[ev.status] || '•'}</span><span>${escHtml(ev.message)}</span>`;
+        log.appendChild(item);
+        scrollToBottom(log);
+      }
+      renderedActivity = events.length;
+    }
+
+    // Render markdown-ish reply (bold + newlines) safely.
+    function renderReply(text) {
+      let html = escHtml(text)
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\n/g, '<br>');
+      return html;
+    }
+
+    // --- Override: send a chat message to the backend ------------------------
+    async function sendMessage() {
+      if (appState.inputLocked) return;
+      const input = document.getElementById('chatInput');
+      const text = input.value.trim();
+      if (!text) return;
+
+      input.value = '';
+      input.style.height = 'auto';
+      appendUserMessage(text);
+      lockInput(true);
+      showTyping();
+
+      try {
+        const res = await fetch(api('/api/chat'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        renderActivity(data.activity);
+        appendAgentMessage(renderReply(data.reply || ''));
+
+        const st = data.state || {};
+        appState.status = st.approval_status || appState.status;
+        if (st.approval_status === 'PENDING_MANAGER_APPROVAL') {
+          await showApprovalCardFromBackend(st.reference_id);
+        }
+      } catch (err) {
+        removeTyping();
+        appendAgentMessage(
+          `⚠ I couldn't reach the backend (${escHtml(String(err.message))}). ` +
+          `Make sure the API is running and reachable.`
+        );
+      } finally {
+        lockInput(false);
+      }
+    }
+
+    // --- Populate the manager approval card from backend data ----------------
+    async function showApprovalCardFromBackend(refId) {
+      try {
+        const res = await fetch(api('/api/session-state'));
+        const st = await res.json();
+        document.getElementById('apr-dates').textContent = refId || st.reference_id || '—';
+        document.getElementById('apr-type').textContent = 'Pending request';
+        document.getElementById('apr-employee').textContent = st.user_id || '—';
+        document.getElementById('apr-days').textContent = '—';
+        document.getElementById('apr-balance').textContent = '—';
+        document.getElementById('apr-conflicts').textContent =
+          'Surfaced during planning (see Agent Activity).';
+        document.getElementById('apr-rationale').textContent =
+          'Recommended by the agent after coverage and project checks.';
+      } catch (e) { /* non-fatal */ }
+      document.getElementById('approvalSection').classList.add('visible');
+    }
+
+    // --- Resolve a live approval token from the backend ----------------------
+    async function fetchApprovalToken(action) {
+      // The backend exposes tokens through session-state for the demo UI path.
+      const res = await fetch(api('/api/session-state'));
+      const st = await res.json();
+      return { refId: st.reference_id, action };
+    }
+
+    // --- Override: manager approves via the backend --------------------------
+    async function managerApprove() {
+      document.getElementById('btnApprove').disabled = true;
+      document.getElementById('btnReject').disabled = true;
+      await callApproval('approve');
+    }
+
+    async function managerReject() {
+      document.getElementById('btnApprove').disabled = true;
+      document.getElementById('btnReject').disabled = true;
+      await callApproval('reject');
+    }
+
+    async function callApproval(action) {
+      try {
+        // The UI card uses the dedicated UI-decision endpoint keyed by reference id.
+        const res = await fetch(api('/api/ui-approval'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action }),
+        });
+        const data = await res.json();
+        renderActivity((await (await fetch(api('/api/session-state'))).json()).activity);
+        if (data.success) {
+          if (action === 'approve') {
+            appendAgentMessage(`Your leave was <strong>approved</strong>. Reference ` +
+              `<span class="ref-id">${escHtml(data.employee_time_id || '')}</span>. A confirmation email has been sent.`);
+          } else {
+            appendAgentMessage(`The request was <strong>rejected</strong>. No leave balance was deducted.`);
+          }
+        } else {
+          appendAgentMessage(`⚠ ${escHtml(data.message || 'Could not process the decision.')}`);
+        }
+      } catch (err) {
+        appendAgentMessage(`⚠ Couldn't reach the backend to record the decision.`);
+      } finally {
+        document.getElementById('approvalSection').classList.remove('visible');
+        lockInput(false);
+      }
+    }
+
+    // --- Override: reset clears backend session too --------------------------
+    const _mockReset = resetDemo;
+    async function resetDemo() {
+      renderedActivity = 0;
+      try { await fetch(api('/api/reset'), { method: 'POST' }); } catch (e) { /* ignore */ }
+      _mockReset();
+    }
+  </script>
+
 </body>
 </html>

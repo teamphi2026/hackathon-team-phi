@@ -205,6 +205,45 @@ def handle_approval_token(token: str, action: str | None = None) -> dict[str, An
                 "message": f"Request {employee_time_id} rejected."}
 
 
+def handle_ui_decision(employee_time_id: str, action: str) -> dict[str, Any]:
+    """Apply a manager decision made in the UI card (no email token).
+
+    Same guarantees as handle_approval_token: only acts on a Pending row,
+    writes a debit on approve, and is a no-op if already decided.
+    """
+    session = get_session()
+    resolved = (action or "").lower()
+    if resolved not in ("approve", "reject"):
+        return {"success": False, "message": f"Unknown action: {action!r}"}
+
+    header, rows = _read_rows(EMPLOYEE_TIME)
+    target = next((r for r in rows if r["employee_time_id"] == employee_time_id), None)
+    if target is None:
+        return {"success": False, "message": f"Request {employee_time_id} not found."}
+    if target["approval_status"] != "Pending":
+        return {"success": False,
+                "message": f"Request {employee_time_id} is not pending (currently {target['approval_status']})."}
+
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    if resolved == "approve":
+        target["approval_status"] = "Approved"
+        target["decided_at"] = now
+        _write_rows(EMPLOYEE_TIME, header, rows)
+        _write_debit_row(target)
+        session.approval_status = "SUBMITTED"
+        session.log_activity("ok", f"{employee_time_id} approved (UI) — ledger updated")
+        return {"success": True, "action": "approve", "employee_time_id": employee_time_id,
+                "message": f"Request {employee_time_id} approved."}
+    target["approval_status"] = "Rejected"
+    target["decided_at"] = now
+    target["decision_note"] = "Rejected by manager"
+    _write_rows(EMPLOYEE_TIME, header, rows)
+    session.approval_status = "REJECTED"
+    session.log_activity("conflict", f"{employee_time_id} rejected (UI)")
+    return {"success": True, "action": "reject", "employee_time_id": employee_time_id,
+            "message": f"Request {employee_time_id} rejected."}
+
+
 def _write_debit_row(request_row: dict[str, str]) -> None:
     """Write the Time_Account_Detail debit for an approved request."""
     leave_type = request_row["time_type_code"]

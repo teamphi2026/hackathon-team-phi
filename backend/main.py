@@ -61,6 +61,30 @@ def approval(token: str, action: str = "approve") -> dict:
     return result
 
 
+class UIApproval(BaseModel):
+    action: str
+
+
+@app.post("/api/ui-approval")
+def ui_approval(req: UIApproval) -> dict:
+    """Manager decision made in the UI card (not via an email token).
+
+    Acts on the session's current pending request. Mirrors the token path:
+    applies the state transition then emails the employee.
+    """
+    s = get_session()
+    if not s.reference_id:
+        return {"success": False, "message": "No pending request to decide on."}
+    result = actions.handle_ui_decision(s.reference_id, req.action)
+    if result.get("success"):
+        eid = result["employee_time_id"]
+        if result["action"] == "approve":
+            email_service.send_confirmation_email(eid)
+        else:
+            email_service.send_rejection_email(eid, reason="Rejected by manager")
+    return result
+
+
 @app.get("/api/session-state")
 def session_state() -> dict:
     """Snapshot of workflow state for the manager approval UI card."""

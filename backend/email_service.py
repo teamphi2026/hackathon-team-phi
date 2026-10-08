@@ -73,7 +73,8 @@ def _failure_hint(code: int | None, text: str, stage: str, exc_name: str) -> str
     """Plain-English next step for the SMTP failures we have actually hit."""
     t = (text or "").lower()
     if code == 525 or "unauthorized ip" in t:
-        return "Provider blocks unknown IPs: add this machine's public IP to its authorized-IP list."
+        return ("Provider blocks unknown IPs. In Brevo: Security > Authorized IPs, turn off blocking "
+                "(a hosted server's outbound IP changes, so allow-listing it won't stick).")
     if "smtpclientauthentication is disabled" in t:
         return "SMTP AUTH is disabled for this Microsoft mailbox: use another sender/provider."
     if code in (535, 534, 530) or exc_name == "SMTPAuthenticationError":
@@ -83,7 +84,9 @@ def _failure_hint(code: int | None, text: str, stage: str, exc_name: str) -> str
     if exc_name == "SMTPServerDisconnected":
         return f"Server closed the connection during '{stage}': check SMTP_HOST/PORT match the account's provider."
     if exc_name in ("TimeoutError", "socket.timeout", "gaierror", "ConnectionRefusedError", "OSError"):
-        return "Network problem reaching SMTP_HOST:SMTP_PORT (firewall, VPN or wrong host)."
+        return ("Can't reach SMTP_HOST:SMTP_PORT. Many hosts (e.g. Render's free tier) block outbound "
+                "SMTP on ports 25/465/587: set SMTP_PORT=2525 (Brevo supports it). Otherwise check "
+                "firewall/VPN and the host name.")
     return ""
 
 

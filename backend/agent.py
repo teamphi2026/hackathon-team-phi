@@ -22,7 +22,7 @@ from typing import Any, Callable
 
 from . import config, filters
 from .state import SessionState, get_session
-from .tools import actions, hr
+from .tools import actions, hr, policy_rag
 from .tools import team_project as tp
 
 # ---------------------------------------------------------------------------
@@ -41,6 +41,7 @@ TOOLS: dict[str, Callable[..., Any]] = {
     "find_viable_date_ranges": tp.find_viable_date_ranges,
     "submit_leave_request": actions.submit_leave_request,
     "handle_approval_token": actions.handle_approval_token,
+    "search_policy": policy_rag.search_policy,
 }
 
 _CONFIRM_WORDS = re.compile(r"\b(yes|confirm|proceed|go ahead|do it|book it|sounds good)\b", re.I)
@@ -92,11 +93,18 @@ def _route(message: str, session: SessionState) -> str:
     if "status" in text and m:
         return _status_lookup(m.group(1).upper())
 
-    # 3) Balance query.
-    if any(w in text for w in ("balance", "how many days", "entitlement", "leave do i have")):
+    # 3) Policy question (grounded in the company policy document).
+    if any(w in text for w in ("policy", "entitled to", "how many days do i get",
+                               "how much", "rules on", "allowed", "carry over",
+                               "carry-over", "expire")):
+        return _policy_reply(message)
+
+    # 4) Balance query (the user's own live numbers).
+    if any(w in text for w in ("balance", "how many days do i have", "my entitlement",
+                               "leave do i have", "days left", "days remaining")):
         return _balance_reply(session)
 
-    # 4) Leave request.
+    # 5) Leave request.
     if any(w in text for w in ("leave", "day off", "days off", "time off", "holiday", "childcare")):
         return _leave_request_reply(message, session)
 
@@ -119,6 +127,16 @@ def _balance_reply(session: SessionState) -> str:
         lines.append(f"- {label}: {a['available']} day(s) available{note}")
     session.log_activity("ok", "Entitlements loaded")
     return "Here's your current leave balance:\n" + "\n".join(lines)
+
+
+def _policy_reply(message: str) -> str:
+    result = _run_tool("search_policy", "Searching leave policy", status="ok", question=message)
+    citations = result.get("citations", [])
+    if not citations:
+        return result.get("answer", "I couldn't find that in the policy.")
+    top = citations[0]
+    get_session().log_activity("ok", f"Policy match — {top['section']}")
+    return result["answer"]
 
 
 def _leave_request_reply(message: str, session: SessionState) -> str:

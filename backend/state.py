@@ -42,6 +42,9 @@ class SessionState:
     approval_status: str | None = None
     reference_id: str | None = None
 
+    # {token: {employee_time_id, action, expiry, used}} — managed by email_service
+    approval_token_map: dict[str, Any] = field(default_factory=dict)
+
     # activity log for the Agent Activity panel
     activity: list[dict[str, Any]] = field(default_factory=list)
 

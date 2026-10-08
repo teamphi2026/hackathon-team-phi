@@ -149,7 +149,7 @@ Employees who fall sick during employment are eligible for medical and must info
 
 You are entitled to 14 working days of medical leave (outpatient sick leave) when you are assessed by a registered medical practitioner to be unfit for work due to illness or injuries.
 
-If hospitalization leave is deemed necessary by the doctor, you are entitled to a total of 60 working days of hospitalization leave (inclusive of any medical leaves taken during the year). Should you require extended leave, reach out, or request your manager to contact the Corporate Health & Safety/ Medical Case Management Team on your behalf, for recommendation once sick leave reaches 50 days.
+If hospitalization leave is deemed necessary by the doctor, you are entitled to a total of 60 working days of hospitalization leave (inclusive of any medical leaves taken during the year). Should you require extended leave, reach out, or request your manager to contact the Occupational Health Team on your behalf, for recommendation once sick leave reaches 50 days.
 
 Medical Certificate (MC) is required to support your outpatient/hospitalization sick leave.
 
@@ -157,12 +157,12 @@ Medical Certificate (MC) is required to support your outpatient/hospitalization 
 
 | Leave Type | When | Remarks |
 |---|---|---|
-| Medical/Hospitalization | The employee is certified to be unfit for work by a medical practitioner registered under the Medical Registration Act or Dental Registration Act. | Employees on hospitalization leave approaching 50 days should seek consultation from Corporate Health & Safety/Medical Case Management should extended leave is needed. |
-| Sickness & Accident Income Plan (SAIP) | The employee requires extended leave and has fully exhausted their statutory medical or hospitalization leave. | The employee must secure recommendation from MCM via email for the extended leave. |
+| Medical/Hospitalization | The employee is certified to be unfit for work by a medical practitioner registered under the Medical Registration Act or Dental Registration Act. | Employees on hospitalization leave approaching 50 days should seek consultation from Occupational Health Team should extended leave is needed. |
+| Extended Sick Income Plan | The employee requires extended leave and has fully exhausted their statutory medical or hospitalization leave. | The employee must secure recommendation from the Occupational Health Team via email for the extended leave. |
 | Annual Leave | After the employee has fully availed the leave programs in 1 & 2. | Subject to manager's approval. |
 | Additional Time off – Unpaid | After the employee has fully availed the leave programs from 1 to 3. | Maximum of 30 days and is subject to manager's approval. |
 | Personal Leave of Absence – Unpaid | The employee has exhausted their accrued annual leave entitlement and requires additional leave for medical reasons. | |
-| Medical Disability Plan | The employee is Totally/Permanently Disabled after he/she has been with I Be Yam continuously for 10 years. | The employee must secure recommendation from MCM via email for the extended leave. |
+| Long-Term Disability Plan | The employee is Totally/Permanently Disabled after he/she has been with I Be Yam continuously for 10 years. | The employee must secure recommendation from the Occupational Health Team via email for the extended leave. |
 
 ### FAQ – Medical / Hospitalization Leave
 
@@ -182,7 +182,7 @@ Answer: You are required to submit your MC to your manager to sighting and endor
 
 **Q4: Am I allowed to take more than 60 days of paid Medica/Hospitalization leave?**
 
-Answer: You or Your manager will need to consult Corporate Health & Safety team or Medical Case Management for review and recommendation.
+Answer: You or Your manager will need to consult Occupational Health Team for review and recommendation.
 
 ---
 
@@ -348,7 +348,7 @@ To calculate pro-rated childcare leave, please visit https://example.com/childca
 
 **Q3: My child is 7 years old, but I should still be entitled for 6 days as I took my first childcare leave when my child was 1 year old. What should I do since SuccessFactors doesn't seem to allow me to submit request?**
 
-Answer: You may seek assistance from Benefits team through raising an AskHR ticket for request to submit the leave in your behalf. Note that it will still route to your manager for approval.
+Answer: You may seek assistance from Rewards Team through raising an AskHR ticket for request to submit the leave in your behalf. Note that it will still route to your manager for approval.
 
 ### 9.1 Summary Table – Coordination Between Childcare Leave and I Be Yam Family Care Leave
 
@@ -396,16 +396,16 @@ Detailed regulatory description of this leave type is available here.
 1. Download and complete the GPML Declaration Form.
 2. Submit Absence in SF under Time Management > Administer Time > Create Absence > Maternity Leave (First 8 Weeks) and attach your completed GPML form at the supporting document section (for I Be Yam HR to seek reimbursement from Government)
 3. Manager's approval or rejection.
-4. Benefits Team will conduct an initial check to confirm employee's eligibility for the Government paid maternity leave to seek Government reimbursement here.
+4. Rewards Team will conduct an initial check to confirm employee's eligibility for the Government paid maternity leave to seek Government reimbursement here.
 
 *Second 8 Weeks Taken Flexibly*
 
 1. Download and complete GPML form here.
 2. Apply in SuccessFactors under Time Management > Administer Time > Create Absence > Maternity Leave (Second 8 Weeks)
 3. Go to "Maintain My Worker Documents".
-4. Upload your completed GPML form (for Benefits Team to seek reimbursement from Government).
+4. Upload your completed GPML form (for Rewards Team to seek reimbursement from Government).
 5. Manager's approval or rejection.
-6. Benefits Team will conduct an initial check to confirm employee eligibility for the Government paid maternity leave to seek Government reimbursement here.
+6. Rewards Team will conduct an initial check to confirm employee eligibility for the Government paid maternity leave to seek Government reimbursement here.
 
 **If your newborn child is a non-Singapore Citizen**
 
@@ -485,9 +485,9 @@ Detailed regulatory description of this leave is available here.
 1. Download and complete Adoption Leave Declaration Form.
 2. Apply in SuccessFactors under Time Management > Administer Time > Create Absence > Adoption Time Off
 3. Go to "Maintain My Worker Documents".
-4. Upload your completed Adoption Leave form (for Benefits Team to seek reimbursement from Government)
+4. Upload your completed Adoption Leave form (for Rewards Team to seek reimbursement from Government)
 5. Manager's approval or rejection.
-6. Benefits Team will conduct an initial check to confirm employee's eligibility for the Government paid Adoption Leave to seek Government reimbursement here.
+6. Rewards Team will conduct an initial check to confirm employee's eligibility for the Government paid Adoption Leave to seek Government reimbursement here.
 
 **If you, your husband, or your adopted infant are not Singapore Citizen**
 
@@ -529,7 +529,7 @@ You can take your leave as follows: https://example.com/paternity-leave
 *Taken In One Continuous Block*
 
 1. Download and complete Paternity Leave here.
-2. Apply in SF under Time Management > Administer Time > Create Absence > Parental Time Off. Upload your completed Paternity Leave (for Benefits Team to seek reimbursement from Government).
+2. Apply in SF under Time Management > Administer Time > Create Absence > Parental Time Off. Upload your completed Paternity Leave (for Rewards Team to seek reimbursement from Government).
 3. Manager's approval or rejection.
 
 *Taken Flexibly*
@@ -537,7 +537,7 @@ You can take your leave as follows: https://example.com/paternity-leave
 1. Download and complete the Parental Leave form here.
 2. SF under Time Management > Administer Time > Create Absence > Parental Time Off
 3. Go to "Maintain My Worker Documents".
-4. Upload your completed Parental Leave form (for Benefits Team to seek reimbursement from Government).
+4. Upload your completed Parental Leave form (for Rewards Team to seek reimbursement from Government).
 5. Manager's approval or rejection.
 
 **If your newborn child or adopted infant is a Non-Singapore Citizen**

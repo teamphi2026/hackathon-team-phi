@@ -21,6 +21,7 @@ from pydantic import BaseModel
 from . import agent, auth, email_service
 from .state import get_session
 from .tools import actions
+from .tools import team_project as tp
 
 app = FastAPI(title="Project-Aware Leave Planning Agent")
 
@@ -157,6 +158,16 @@ def ui_approval(req: UIApproval, authorization: Optional[str] = Header(default=N
         else:
             email_service.send_rejection_email(eid, reason="Rejected by manager")
     return result
+
+
+@app.get("/api/team-calendar")
+def team_calendar(year: int, month: int,
+                  authorization: Optional[str] = Header(default=None)) -> dict:
+    """Month calendar of the logged-in user's teams: named leave + coverage."""
+    _require_identity(authorization)
+    if not (1 <= month <= 12):
+        raise HTTPException(status_code=400, detail="month must be 1-12.")
+    return tp.get_team_calendar(year, month)
 
 
 @app.get("/api/session-state")

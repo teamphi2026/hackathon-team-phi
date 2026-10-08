@@ -292,3 +292,111 @@ def _reason_string(start, end, days, coverage, events) -> str:
         f"{start} to {end} ({days} working day(s)): {cover_txt}, no conflicts "
         f"with your existing leave.{ev_txt}"
     )
+
+
+# ---------------------------------------------------------------------------
+# get_team_calendar — month view with named entries + per-day coverage
+# ---------------------------------------------------------------------------
+
+def _employee_names() -> dict[str, str]:
+    ji = _load("02_Job_Information.csv")
+    return dict(zip(ji.user_id, ji.full_name))
+
+
+def _month_bounds(year: int, month: int) -> tuple[date, date]:
+    first = date(year, month, 1)
+    if month == 12:
+        nxt = date(year + 1, 1, 1)
+    else:
+        nxt = date(year, month + 1, 1)
+    return first, nxt - timedelta(days=1)
+
+
+def get_team_calendar(year: int, month: int) -> dict[str, Any]:
+    """Month calendar for the session user's teams.
+
+    Returns, for each team the user belongs to:
+      - team metadata (name, headcount, min_staff_on_duty)
+      - named leave entries overlapping the month (who, type, dates, status)
+      - per-day coverage status (OK / AT_MIN / SHORT) for colouring
+
+    Names ARE included here (unlike the anonymised chat tools): this is a
+    first-party team calendar view, not an LLM response subject to the output
+    filter. Only the user's own teams are exposed.
+    """
+    uid = _current_user_id()
+    start, end = _month_bounds(year, month)
+    names = _employee_names()
+    teams_df = _load("03_Teams.csv")
+    types_df = _load("05_Time_Type.csv")
+    type_name = dict(zip(types_df.time_type_code, types_df.time_type_name))
+
+    absences = _absences_in_range(start, end)
+
+    teams_out: list[dict[str, Any]] = []
+    for team_id in _user_team_ids(uid):
+        trow = teams_df[teams_df.team_id == team_id]
+        if trow.empty:
+            continue
+        trow = trow.iloc[0]
+        headcount = int(float(trow["headcount"]))
+        min_required = int(float(trow["min_staff_on_duty"]))
+        members = set(_team_members(team_id))
+
+        # Named leave entries for this team's members, overlapping the month.
+        team_abs = absences[absences.user_id.isin(members)]
+        entries = []
+        for _, r in team_abs.iterrows():
+            entries.append(
+                {
+                    "user_id": r["user_id"],
+                    "name": names.get(r["user_id"], r["user_id"]),
+                    "leave_type": r["time_type_code"],
+                    "leave_type_name": type_name.get(r["time_type_code"], r["time_type_code"]),
+                    "start_date": r["start_date"],
+                    "end_date": r["end_date"],
+                    "status": r["approval_status"],
+                    "is_self": r["user_id"] == uid,
+                }
+            )
+
+        # Per-day coverage status across the month (for day colouring).
+        day_status: dict[str, str] = {}
+        d = start
+        while d <= end:
+            absent = 0
+            for _, r in team_abs.iterrows():
+                try:
+                    rs, re = _parse(r["start_date"]), _parse(r["end_date"])
+                except (ValueError, TypeError):
+                    continue
+                if rs <= d <= re:
+                    absent += 1
+            on_duty = headcount - absent
+            if on_duty > min_required:
+                status = "OK"
+            elif on_duty == min_required:
+                status = "AT_MIN"
+            else:
+                status = "SHORT"
+            day_status[d.isoformat()] = status
+            d += timedelta(days=1)
+
+        teams_out.append(
+            {
+                "team_id": team_id,
+                "team_name": trow["team_name"],
+                "headcount": headcount,
+                "min_required": min_required,
+                "entries": entries,
+                "day_status": day_status,
+            }
+        )
+
+    return {
+        "year": year,
+        "month": month,
+        "start_date": start.isoformat(),
+        "end_date": end.isoformat(),
+        "teams": teams_out,
+    }

@@ -554,10 +554,57 @@
       to   { opacity: 1; transform: translateY(0); }
     }
 
+    /* ─── Nav tabs ──────────────────────────────────────────────────────── */
+    .nav-center { display: flex; gap: 6px; }
+    .nav-tab {
+      background: transparent; border: 1px solid var(--border); color: var(--muted);
+      padding: 7px 14px; border-radius: 8px; cursor: pointer; font-size: 13px;
+    }
+    .nav-tab.active { color: var(--text); background: rgba(108,99,255,0.16); border-color: var(--accent); }
+
+    /* ─── Team Calendar ─────────────────────────────────────────────────── */
+    .calendar-view { padding: 20px 28px; height: calc(100vh - 56px); overflow-y: auto; }
+    .cal-toolbar { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+    .cal-title { font-size: 18px; margin: 0; min-width: 220px; text-align: center; }
+    .cal-nav {
+      background: var(--panel); border: 1px solid var(--border); color: var(--text);
+      width: 34px; height: 34px; border-radius: 8px; cursor: pointer; font-size: 18px;
+    }
+    .cal-nav:hover { background: rgba(108,99,255,0.14); }
+    .cal-legend { display: flex; gap: 16px; margin-left: auto; font-size: 12px; color: var(--muted); }
+    .cal-legend .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: middle; }
+    .dot.ok { background: #22c55e; } .dot.atmin { background: #f59e0b; } .dot.short { background: #ef4444; }
+
+    .cal-team { margin-bottom: 26px; }
+    .cal-team-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+    .cal-team-head h3 { margin: 0; font-size: 15px; }
+    .cal-team-head .meta { color: var(--muted); font-size: 12px; }
+
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+    .cal-dow { text-align: center; font-size: 11px; color: var(--muted); padding: 4px 0; }
+    .cal-cell {
+      min-height: 74px; border: 1px solid var(--border); border-radius: 8px; padding: 5px 6px;
+      background: var(--panel); position: relative; overflow: hidden;
+    }
+    .cal-cell.empty { background: transparent; border: none; }
+    .cal-cell.ok    { border-left: 3px solid #22c55e; }
+    .cal-cell.atmin { border-left: 3px solid #f59e0b; background: rgba(245,158,11,0.05); }
+    .cal-cell.short { border-left: 3px solid #ef4444; background: rgba(239,68,68,0.07); }
+    .cal-daynum { font-size: 11px; color: var(--muted); margin-bottom: 3px; }
+    .cal-chip {
+      font-size: 10px; line-height: 1.3; border-radius: 4px; padding: 1px 4px; margin-bottom: 2px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .cal-chip.self    { background: rgba(108,99,255,0.25); color: #c7d2fe; font-weight: 600; }
+    .cal-chip.pending { background: rgba(245,158,11,0.18); color: #fde68a; }
+    .cal-chip.approved{ background: rgba(34,197,94,0.16); color: #86efac; }
+    .cal-loading { color: var(--muted); padding: 40px; text-align: center; }
+
     /* ─── Responsive ────────────────────────────────────────────────────── */
     @media (max-width: 768px) {
       .workspace { grid-template-columns: 1fr; }
       .activity-panel { display: none; }
+      .nav-center { display: none; }
     }
   </style>
 </head>
@@ -568,6 +615,10 @@
     <div class="nav-brand">
       <span class="dot"></span>
       Leave Agent
+    </div>
+    <div class="nav-center">
+      <button class="nav-tab active" id="tab-chat" onclick="showView('chat')">💬 Chat</button>
+      <button class="nav-tab" id="tab-calendar" onclick="showView('calendar')">📅 Team Calendar</button>
     </div>
     <div class="nav-right">
       <span class="badge-nav" id="userBadge">…</span>
@@ -684,6 +735,23 @@
           </div>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Team Calendar view (hidden until the Calendar tab is selected) -->
+  <div class="calendar-view" id="calendarView" style="display:none;">
+    <div class="cal-toolbar">
+      <button class="cal-nav" onclick="calPrevMonth()">‹</button>
+      <h2 class="cal-title" id="calTitle">—</h2>
+      <button class="cal-nav" onclick="calNextMonth()">›</button>
+      <div class="cal-legend">
+        <span><i class="dot ok"></i> OK</span>
+        <span><i class="dot atmin"></i> At minimum</span>
+        <span><i class="dot short"></i> Short</span>
+      </div>
+    </div>
+    <div class="cal-body" id="calBody">
+      <div class="cal-loading">Loading calendar…</div>
     </div>
   </div>
 
@@ -833,6 +901,94 @@
       try { await authFetch('/api/logout', { method: 'POST' }); } catch (e) {}
       localStorage.removeItem('leave_token');
       window.location.href = 'login.html';
+    }
+
+    // ─── View switching (Chat ↔ Team Calendar) ───────────────────────────────
+    function showView(view) {
+      const isCal = view === 'calendar';
+      document.querySelector('.workspace').style.display = isCal ? 'none' : '';
+      document.getElementById('calendarView').style.display = isCal ? 'block' : 'none';
+      document.getElementById('tab-chat').classList.toggle('active', !isCal);
+      document.getElementById('tab-calendar').classList.toggle('active', isCal);
+      if (isCal) loadCalendar();
+    }
+
+    // ─── Team Calendar ────────────────────────────────────────────────────────
+    const MONTHS = ['January','February','March','April','May','June','July',
+                    'August','September','October','November','December'];
+    const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    // Default to October 2026 (where the demo leave data lives).
+    let calYear = 2026, calMonth = 10;
+
+    function calPrevMonth() {
+      calMonth--; if (calMonth < 1) { calMonth = 12; calYear--; } loadCalendar();
+    }
+    function calNextMonth() {
+      calMonth++; if (calMonth > 12) { calMonth = 1; calYear++; } loadCalendar();
+    }
+
+    async function loadCalendar() {
+      document.getElementById('calTitle').textContent = `${MONTHS[calMonth-1]} ${calYear}`;
+      const body = document.getElementById('calBody');
+      body.innerHTML = '<div class="cal-loading">Loading calendar…</div>';
+      try {
+        const res = await authFetch(`/api/team-calendar?year=${calYear}&month=${calMonth}`);
+        const data = await res.json();
+        renderCalendar(data);
+      } catch (err) {
+        body.innerHTML = `<div class="cal-loading">Couldn't load the calendar (${escHtml(String(err.message))}).</div>`;
+      }
+    }
+
+    function renderCalendar(data) {
+      const body = document.getElementById('calBody');
+      if (!data.teams || !data.teams.length) {
+        body.innerHTML = '<div class="cal-loading">You are not assigned to any team.</div>';
+        return;
+      }
+      const first = new Date(data.year, data.month - 1, 1);
+      const daysInMonth = new Date(data.year, data.month, 0).getDate();
+      const leadBlanks = first.getDay(); // 0=Sun
+
+      let html = '';
+      for (const team of data.teams) {
+        // Group leave entries by ISO day for quick cell lookup.
+        const byDay = {};
+        for (const e of team.entries) {
+          let d = new Date(e.start_date + 'T00:00:00');
+          const end = new Date(e.end_date + 'T00:00:00');
+          while (d <= end) {
+            const iso = d.toISOString().slice(0, 10);
+            (byDay[iso] = byDay[iso] || []).push(e);
+            d.setDate(d.getDate() + 1);
+          }
+        }
+
+        html += `<div class="cal-team">
+          <div class="cal-team-head">
+            <h3>${escHtml(team.team_name)}</h3>
+            <span class="meta">min ${team.min_required} of ${team.headcount} on duty</span>
+          </div>
+          <div class="cal-grid">`;
+        for (const d of DOW) html += `<div class="cal-dow">${d}</div>`;
+        for (let i = 0; i < leadBlanks; i++) html += `<div class="cal-cell empty"></div>`;
+
+        for (let day = 1; day <= daysInMonth; day++) {
+          const iso = `${data.year}-${String(data.month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+          const status = (team.day_status && team.day_status[iso]) || 'ok';
+          const entries = byDay[iso] || [];
+          let chips = '';
+          for (const e of entries) {
+            const cls = e.is_self ? 'self' : (e.status === 'Approved' ? 'approved' : 'pending');
+            const label = e.is_self ? `You · ${e.leave_type}` : `${e.name.split(' ')[0]} · ${e.leave_type}`;
+            chips += `<div class="cal-chip ${cls}" title="${escHtml(e.name)} — ${escHtml(e.leave_type_name)} (${e.status})">${escHtml(label)}</div>`;
+          }
+          html += `<div class="cal-cell ${status.toLowerCase()}">
+            <div class="cal-daynum">${day}</div>${chips}</div>`;
+        }
+        html += `</div></div>`;
+      }
+      body.innerHTML = html;
     }
 
     // Gate the page: redirect to login if not authenticated, else greet by name.

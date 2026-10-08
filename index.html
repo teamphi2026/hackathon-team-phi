@@ -1,191 +1,1164 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Leave Agent — Team Phi</title>
+  <style>
+    /* ─── Reset & Base ─────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    <title>Hello World</title>
+    :root {
+      --bg:        #080b12;
+      --surface:   #0f1420;
+      --surface2:  #151c2c;
+      --border:    rgba(255,255,255,0.08);
+      --border2:   rgba(255,255,255,0.14);
+      --text:      #e2e8f0;
+      --muted:     #64748b;
+      --accent:    #6c63ff;
+      --accent2:   #00d4ff;
+      --green:     #22c55e;
+      --amber:     #f59e0b;
+      --red:       #ef4444;
+      --blue:      #3b82f6;
+      --radius:    14px;
+    }
 
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+    html, body { height: 100%; }
 
-        body {
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+    body {
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.6;
+      display: flex;
+      flex-direction: column;
+    }
 
-            font-family:
-                Inter,
-                -apple-system,
-                BlinkMacSystemFont,
-                "Segoe UI",
-                sans-serif;
+    /* ─── Top Nav ───────────────────────────────────────────────────────── */
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      height: 56px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      gap: 12px;
+    }
 
-            color: #ffffff;
-            background: #080b12;
-            overflow: hidden;
-        }
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 15px;
+      letter-spacing: -0.02em;
+    }
 
-        /* Ambient background */
-        body::before,
-        body::after {
-            content: "";
-            position: absolute;
-            width: 500px;
-            height: 500px;
-            border-radius: 50%;
-            filter: blur(120px);
-            opacity: 0.35;
-            animation: float 8s ease-in-out infinite alternate;
-        }
+    .nav-brand .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green);
+      animation: pulse 2s infinite;
+    }
 
-        body::before {
-            background: #6c63ff;
-            top: -200px;
-            left: -150px;
-        }
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
 
-        body::after {
-            background: #00d4ff;
-            right: -200px;
-            bottom: -200px;
-            animation-delay: -4s;
-        }
+    .badge-nav {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: rgba(108,99,255,0.15);
+      border: 1px solid rgba(108,99,255,0.3);
+      color: #a5b4fc;
+    }
 
-        /* Main card */
-        .card {
-            position: relative;
-            z-index: 1;
+    .btn-reset {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border2);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-reset:hover { color: var(--text); border-color: rgba(255,255,255,0.25); background: rgba(255,255,255,0.05); }
 
-            width: min(90%, 720px);
-            padding: 80px 60px;
+    /* ─── Main Layout ───────────────────────────────────────────────────── */
+    .workspace {
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      flex: 1;
+      overflow: hidden;
+      gap: 0;
+    }
 
-            text-align: center;
+    /* ─── Left Panel — Chat ─────────────────────────────────────────────── */
+    .chat-panel {
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+      overflow: hidden;
+    }
 
-            background: rgba(255, 255, 255, 0.06);
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            border-radius: 28px;
+    .panel-header {
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      background: var(--surface);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
 
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
+    .panel-header .icon { opacity: 0.6; }
 
-            box-shadow:
-                0 25px 80px rgba(0, 0, 0, 0.45),
-                inset 0 1px 0 rgba(255, 255, 255, 0.08);
-        }
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
 
-        .badge {
-            display: inline-block;
-            margin-bottom: 24px;
-            padding: 8px 14px;
+    .messages::-webkit-scrollbar { width: 4px; }
+    .messages::-webkit-scrollbar-track { background: transparent; }
+    .messages::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
 
-            font-size: 13px;
-            font-weight: 600;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
+    /* Message bubbles */
+    .msg {
+      display: flex;
+      gap: 10px;
+      max-width: 85%;
+    }
 
-            color: #a5f3fc;
-            background: rgba(34, 211, 238, 0.1);
-            border: 1px solid rgba(34, 211, 238, 0.2);
-            border-radius: 999px;
-        }
+    .msg.user { flex-direction: row-reverse; align-self: flex-end; }
+    .msg.agent { align-self: flex-start; }
 
-        h1 {
-            font-size: clamp(3rem, 8vw, 6rem);
-            line-height: 1;
-            font-weight: 800;
-            letter-spacing: -0.06em;
+    .msg-avatar {
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
 
-            background: linear-gradient(
-                135deg,
-                #ffffff 20%,
-                #a5f3fc 50%,
-                #818cf8 80%
-            );
+    .msg.agent .msg-avatar { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; }
+    .msg.user  .msg-avatar { background: rgba(255,255,255,0.1); color: var(--text); }
 
-            -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent;
-        }
+    .msg-body { display: flex; flex-direction: column; gap: 4px; }
 
-        p {
-            margin-top: 24px;
+    .msg-bubble {
+      padding: 11px 14px;
+      border-radius: 12px;
+      line-height: 1.55;
+      font-size: 13.5px;
+    }
 
-            font-size: 1.1rem;
-            line-height: 1.7;
-            color: #94a3b8;
-        }
+    .msg.agent .msg-bubble {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-top-left-radius: 4px;
+      color: var(--text);
+    }
 
-        .button {
-            display: inline-block;
-            margin-top: 36px;
-            padding: 14px 24px;
+    .msg.user .msg-bubble {
+      background: rgba(108,99,255,0.2);
+      border: 1px solid rgba(108,99,255,0.3);
+      border-top-right-radius: 4px;
+      color: var(--text);
+    }
 
-            color: #ffffff;
-            background: rgba(255, 255, 255, 0.08);
+    .msg-time {
+      font-size: 11px;
+      color: var(--muted);
+      padding: 0 2px;
+    }
+    .msg.user .msg-time { text-align: right; }
 
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            border-radius: 12px;
+    /* Typing indicator */
+    .typing-indicator { display: flex; gap: 4px; align-items: center; padding: 4px 0; }
+    .typing-indicator span {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--muted);
+      animation: typing 1.2s infinite;
+    }
+    .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+    .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
 
-            font-size: 14px;
-            font-weight: 600;
-            text-decoration: none;
+    /* Recommendation card inside chat */
+    .rec-card {
+      margin: 4px 0;
+      background: rgba(34,197,94,0.06);
+      border: 1px solid rgba(34,197,94,0.2);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 13px;
+    }
+    .rec-card .rec-title {
+      font-weight: 700;
+      color: var(--green);
+      margin-bottom: 8px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .rec-card .rec-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+    .rec-card .rec-label { color: var(--muted); }
+    .rec-card .rec-value { font-weight: 600; color: var(--text); }
+    .rec-card .rec-reason {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      color: #94a3b8;
+      font-size: 12.5px;
+      line-height: 1.5;
+    }
 
-            transition:
-                transform 0.25s ease,
-                background 0.25s ease,
-                border-color 0.25s ease;
-        }
+    /* Confirmation buttons */
+    .confirm-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .btn-confirm {
+      flex: 1;
+      padding: 9px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+    }
+    .btn-confirm.yes {
+      background: rgba(34,197,94,0.15);
+      border: 1px solid rgba(34,197,94,0.3);
+      color: var(--green);
+    }
+    .btn-confirm.yes:hover { background: rgba(34,197,94,0.25); }
+    .btn-confirm.no {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border2);
+      color: var(--muted);
+    }
+    .btn-confirm.no:hover { color: var(--text); border-color: rgba(255,255,255,0.25); }
+    .btn-confirm:disabled { opacity: 0.4; cursor: not-allowed; }
 
-        .button:hover {
-            transform: translateY(-3px);
-            background: rgba(255, 255, 255, 0.14);
-            border-color: rgba(255, 255, 255, 0.3);
-        }
+    /* Status chip */
+    .status-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .status-chip.pending  { background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.25); color: var(--amber); }
+    .status-chip.approved { background: rgba(34,197,94,0.12);  border: 1px solid rgba(34,197,94,0.25);  color: var(--green); }
+    .status-chip.rejected { background: rgba(239,68,68,0.12);  border: 1px solid rgba(239,68,68,0.25);  color: var(--red);   }
+    .status-chip.done     { background: rgba(108,99,255,0.12); border: 1px solid rgba(108,99,255,0.25); color: #a5b4fc;      }
+    .status-chip .chip-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
 
-        .footer {
-            margin-top: 40px;
+    /* Chat input */
+    .chat-input-area {
+      padding: 14px 20px;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      flex-shrink: 0;
+    }
 
-            font-size: 12px;
-            color: #475569;
-        }
+    .input-row {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
 
-        @keyframes float {
-            from {
-                transform: translate(0, 0) scale(1);
-            }
+    .chat-input {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: 10px;
+      padding: 10px 14px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 13.5px;
+      resize: none;
+      outline: none;
+      min-height: 42px;
+      max-height: 120px;
+      transition: border-color 0.2s;
+    }
+    .chat-input::placeholder { color: var(--muted); }
+    .chat-input:focus { border-color: rgba(108,99,255,0.5); }
 
-            to {
-                transform: translate(40px, 30px) scale(1.1);
-            }
-        }
+    .btn-send {
+      width: 40px; height: 40px;
+      border-radius: 10px;
+      background: var(--accent);
+      border: none;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      transition: all 0.2s;
+      color: white;
+      font-size: 16px;
+    }
+    .btn-send:hover { background: #7c75ff; transform: translateY(-1px); }
+    .btn-send:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
 
-        @media (max-width: 600px) {
-            .card {
-                padding: 60px 25px;
-            }
+    .input-hint {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 8px;
+    }
 
-            p {
-                font-size: 1rem;
-            }
-        }
-    </style>
+    /* ─── Right Panel — Activity ────────────────────────────────────────── */
+    .activity-panel {
+      display: flex;
+      flex-direction: column;
+      background: var(--surface);
+      overflow: hidden;
+    }
+
+    .activity-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .activity-scroll::-webkit-scrollbar { width: 3px; }
+    .activity-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+
+    .activity-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 10px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .activity-empty .empty-icon { font-size: 32px; opacity: 0.4; }
+    .activity-empty .empty-text { font-size: 12px; line-height: 1.5; max-width: 200px; }
+
+    .activity-item {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      line-height: 1.4;
+      animation: fadeSlideIn 0.3s ease;
+    }
+
+    .activity-item.ok      { background: rgba(34,197,94,0.06);  color: #86efac; }
+    .activity-item.fail    { background: rgba(239,68,68,0.06);  color: #fca5a5; }
+    .activity-item.working { background: rgba(59,130,246,0.06); color: #93c5fd; }
+    .activity-item.info    { background: rgba(255,255,255,0.04); color: var(--muted); }
+    .activity-item.rec     { background: rgba(108,99,255,0.08); color: #a5b4fc; }
+    .activity-item.waiting { background: rgba(245,158,11,0.06); color: #fde68a; }
+    .activity-item.done    { background: rgba(34,197,94,0.1);   color: var(--green); font-weight: 600; }
+
+    .activity-icon { flex-shrink: 0; font-size: 13px; margin-top: 1px; }
+
+    /* Manager approval section inside activity panel */
+    .approval-section {
+      border-top: 1px solid var(--border);
+      padding: 16px;
+      flex-shrink: 0;
+      display: none;
+    }
+    .approval-section.visible { display: block; }
+
+    .approval-card {
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: 12px;
+      padding: 14px;
+    }
+
+    .approval-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--muted);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .approval-title::before {
+      content: "";
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--amber);
+      box-shadow: 0 0 6px var(--amber);
+    }
+
+    .approval-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+      font-size: 12.5px;
+    }
+    .approval-label { color: var(--muted); }
+    .approval-value { font-weight: 600; color: var(--text); text-align: right; max-width: 55%; }
+
+    .approval-divider { height: 1px; background: var(--border); margin: 10px 0; }
+
+    .conflict-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      margin: 2px 2px 2px 0;
+    }
+    .conflict-tag.warn { background: rgba(245,158,11,0.12); color: var(--amber); border: 1px solid rgba(245,158,11,0.2); }
+    .conflict-tag.risk { background: rgba(239,68,68,0.10); color: var(--red); border: 1px solid rgba(239,68,68,0.2); }
+    .conflict-tag.ok   { background: rgba(34,197,94,0.10); color: var(--green); border: 1px solid rgba(34,197,94,0.2); }
+
+    .approval-reason {
+      font-size: 12px;
+      color: #94a3b8;
+      font-style: italic;
+      margin-top: 6px;
+      line-height: 1.5;
+    }
+
+    .approval-buttons {
+      display: flex;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .btn-approve, .btn-reject {
+      flex: 1;
+      padding: 9px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .btn-approve {
+      background: rgba(34,197,94,0.15);
+      border: 1px solid rgba(34,197,94,0.35);
+      color: var(--green);
+    }
+    .btn-approve:hover { background: rgba(34,197,94,0.25); }
+    .btn-reject {
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.25);
+      color: var(--red);
+    }
+    .btn-reject:hover { background: rgba(239,68,68,0.2); }
+    .btn-approve:disabled, .btn-reject:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    /* Confirmation banner */
+    .confirmation-banner {
+      margin: 4px 0;
+      background: rgba(108,99,255,0.08);
+      border: 1px solid rgba(108,99,255,0.2);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 13px;
+    }
+    .confirmation-banner .banner-title {
+      font-weight: 700;
+      color: #a5b4fc;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+    .confirmation-banner .ref-id {
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 13px;
+      color: var(--accent2);
+      font-weight: 700;
+      letter-spacing: 0.05em;
+    }
+
+    /* Quick prompts */
+    .quick-prompts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 0 20px 12px;
+    }
+
+    .quick-btn {
+      font-size: 12px;
+      padding: 5px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--border2);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .quick-btn:hover { color: var(--text); border-color: rgba(108,99,255,0.4); background: rgba(108,99,255,0.06); }
+
+    /* ─── Animations ────────────────────────────────────────────────────── */
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.4; }
+    }
+
+    @keyframes typing {
+      0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+      30%            { transform: translateY(-4px); opacity: 1; }
+    }
+
+    @keyframes fadeSlideIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ─── Responsive ────────────────────────────────────────────────────── */
+    @media (max-width: 768px) {
+      .workspace { grid-template-columns: 1fr; }
+      .activity-panel { display: none; }
+    }
+  </style>
 </head>
-
 <body>
 
-    <main class="card">
+  <!-- Nav -->
+  <nav class="nav">
+    <div class="nav-brand">
+      <span class="dot"></span>
+      Leave Agent
+    </div>
+    <div class="nav-right">
+      <span class="badge-nav">IBM Hackathon 2026 · Team Phi</span>
+      <button class="btn-reset" onclick="resetDemo()">↺ Reset Demo</button>
+    </div>
+  </nav>
 
-        <span class="badge">IBM Hackathon 2026</span>
+  <!-- Workspace -->
+  <div class="workspace">
 
-        <h1>Team Phi</h1>
+    <!-- LEFT: Chat -->
+    <div class="chat-panel">
+      <div class="panel-header">
+        <span class="icon">💬</span>
+        Employee Chat
+      </div>
 
-    </main>
+      <div class="messages" id="messages">
+        <!-- Initial agent greeting -->
+        <div class="msg agent">
+          <div class="msg-avatar">A</div>
+          <div class="msg-body">
+            <div class="msg-bubble">
+              Hi! I'm your leave planning assistant. I can help you find the best time to take leave by checking your entitlements, team availability, and project milestones.<br><br>
+              What are you planning?
+            </div>
+            <div class="msg-time">Just now</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick prompt suggestions -->
+      <div class="quick-prompts" id="quickPrompts">
+        <button class="quick-btn" onclick="sendQuick(this)">I need 3 days off around mid-Oct for my child's school event, but I don't want to affect the project</button>
+        <button class="quick-btn" onclick="sendQuick(this)">What's my leave balance?</button>
+        <button class="quick-btn" onclick="sendQuick(this)">Am I eligible for Childcare Leave?</button>
+      </div>
+
+      <!-- Input -->
+      <div class="chat-input-area">
+        <div class="input-row">
+          <textarea
+            id="chatInput"
+            class="chat-input"
+            placeholder="Describe your leave needs..."
+            rows="1"
+            onkeydown="handleKey(event)"
+            oninput="autoResize(this)"
+          ></textarea>
+          <button class="btn-send" id="sendBtn" onclick="sendMessage()" title="Send">
+            ➤
+          </button>
+        </div>
+        <div class="input-hint">Press Enter to send · Shift+Enter for new line</div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Activity + Approval -->
+    <div class="activity-panel">
+      <div class="panel-header">
+        <span class="icon">⚡</span>
+        Agent Activity
+      </div>
+
+      <div class="activity-scroll" id="activityLog">
+        <div class="activity-empty" id="activityEmpty">
+          <div class="empty-icon">🤖</div>
+          <div class="empty-text">Agent tool calls and reasoning steps will appear here during the demo.</div>
+        </div>
+      </div>
+
+      <!-- Manager Approval Card -->
+      <div class="approval-section" id="approvalSection">
+        <div class="approval-card">
+          <div class="approval-title">Manager Approval Required</div>
+
+          <div class="approval-row">
+            <span class="approval-label">Employee</span>
+            <span class="approval-value" id="apr-employee">—</span>
+          </div>
+          <div class="approval-row">
+            <span class="approval-label">Leave Type</span>
+            <span class="approval-value" id="apr-type">—</span>
+          </div>
+          <div class="approval-row">
+            <span class="approval-label">Dates</span>
+            <span class="approval-value" id="apr-dates">—</span>
+          </div>
+          <div class="approval-row">
+            <span class="approval-label">Working Days</span>
+            <span class="approval-value" id="apr-days">—</span>
+          </div>
+          <div class="approval-row">
+            <span class="approval-label">Balance After</span>
+            <span class="approval-value" id="apr-balance">—</span>
+          </div>
+
+          <div class="approval-divider"></div>
+
+          <div class="approval-row" style="align-items:flex-start;">
+            <span class="approval-label">Original Conflict</span>
+            <span class="approval-value" id="apr-conflicts">—</span>
+          </div>
+
+          <div class="approval-row" style="margin-top:6px; align-items:flex-start;">
+            <span class="approval-label">Rationale</span>
+            <span class="approval-value" id="apr-rationale" style="font-weight:400; color:#94a3b8; font-size:12px;">—</span>
+          </div>
+
+          <div class="approval-buttons">
+            <button class="btn-approve" id="btnApprove" onclick="managerApprove()">✓ Approve</button>
+            <button class="btn-reject" id="btnReject" onclick="managerReject()">✗ Reject</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ─── State ──────────────────────────────────────────────────────────────
+    const STATE = {
+      DRAFT: 'DRAFT',
+      EMPLOYEE_CONFIRMED: 'EMPLOYEE_CONFIRMED',
+      PENDING_MANAGER_APPROVAL: 'PENDING_MANAGER_APPROVAL',
+      APPROVED: 'APPROVED',
+      REJECTED: 'REJECTED',
+      SUBMITTED: 'SUBMITTED'
+    };
+
+    let appState = {
+      status: STATE.DRAFT,
+      step: 0,           // tracks which demo step we're on
+      inputLocked: false
+    };
+
+    // ─── Demo data ───────────────────────────────────────────────────────────
+    const DEMO = {
+      employee:    'Alex Tan',
+      team:        'TEAM_PLATFORM',
+      project:     'PROJECT_ALPHA',
+      manager:     'Sarah Lim',
+      leaveType:   'Childcare Leave',
+      origDates:   '14–16 Oct 2026',
+      recDates:    '21–23 Oct 2026',
+      days:        3,
+      balanceBefore: 5,
+      balanceAfter:  2,
+      refId:       'LV-2026-00142'
+    };
+
+    // ─── Mock demo script ────────────────────────────────────────────────────
+    // Each "step" is triggered by a user message.
+    // step 0 = initial greeting already shown
+    // step 1 = user sends the main leave request
+    // step 2 = user confirms recommendation
+    // (manager approval is handled separately via buttons)
+
+    // ─── Helpers ─────────────────────────────────────────────────────────────
+    function now() {
+      return new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+    }
+
+    function scrollToBottom(el) {
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function autoResize(el) {
+      el.style.height = 'auto';
+      el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+    }
+
+    function handleKey(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    }
+
+    function sendQuick(btn) {
+      const input = document.getElementById('chatInput');
+      input.value = btn.textContent;
+      // hide quick prompts after first use
+      document.getElementById('quickPrompts').style.display = 'none';
+      sendMessage();
+    }
+
+    function lockInput(lock) {
+      appState.inputLocked = lock;
+      document.getElementById('chatInput').disabled = lock;
+      document.getElementById('sendBtn').disabled = lock;
+    }
+
+    // ─── Activity panel helpers ───────────────────────────────────────────────
+    function addActivity(type, icon, text, delay = 0) {
+      return new Promise(resolve => {
+        setTimeout(() => {
+          const empty = document.getElementById('activityEmpty');
+          if (empty) empty.style.display = 'none';
+
+          const log = document.getElementById('activityLog');
+          const item = document.createElement('div');
+          item.className = `activity-item ${type}`;
+          item.innerHTML = `<span class="activity-icon">${icon}</span><span>${text}</span>`;
+          log.appendChild(item);
+          scrollToBottom(log);
+          resolve();
+        }, delay);
+      });
+    }
+
+    async function runActivitySequence(items) {
+      for (const [type, icon, text, delay] of items) {
+        await addActivity(type, icon, text, delay);
+      }
+    }
+
+    // ─── Chat message helpers ─────────────────────────────────────────────────
+    function appendUserMessage(text) {
+      const msgs = document.getElementById('messages');
+      const el = document.createElement('div');
+      el.className = 'msg user';
+      el.innerHTML = `
+        <div class="msg-avatar">E</div>
+        <div class="msg-body">
+          <div class="msg-bubble">${escHtml(text)}</div>
+          <div class="msg-time">${now()}</div>
+        </div>`;
+      msgs.appendChild(el);
+      scrollToBottom(msgs);
+    }
+
+    function showTyping() {
+      const msgs = document.getElementById('messages');
+      const el = document.createElement('div');
+      el.className = 'msg agent';
+      el.id = 'typingMsg';
+      el.innerHTML = `
+        <div class="msg-avatar">A</div>
+        <div class="msg-body">
+          <div class="msg-bubble">
+            <div class="typing-indicator"><span></span><span></span><span></span></div>
+          </div>
+        </div>`;
+      msgs.appendChild(el);
+      scrollToBottom(msgs);
+      return el;
+    }
+
+    function removeTyping() {
+      const el = document.getElementById('typingMsg');
+      if (el) el.remove();
+    }
+
+    function appendAgentMessage(html, extraEl) {
+      removeTyping();
+      const msgs = document.getElementById('messages');
+      const el = document.createElement('div');
+      el.className = 'msg agent';
+      let extra = extraEl ? `<div style="margin-top:8px;">${extraEl}</div>` : '';
+      el.innerHTML = `
+        <div class="msg-avatar">A</div>
+        <div class="msg-body">
+          <div class="msg-bubble">${html}${extra}</div>
+          <div class="msg-time">${now()}</div>
+        </div>`;
+      msgs.appendChild(el);
+      scrollToBottom(msgs);
+      return el;
+    }
+
+    function escHtml(s) {
+      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    // ─── Main send handler ────────────────────────────────────────────────────
+    async function sendMessage() {
+      if (appState.inputLocked) return;
+
+      const input = document.getElementById('chatInput');
+      const text = input.value.trim();
+      if (!text) return;
+
+      input.value = '';
+      input.style.height = 'auto';
+
+      appendUserMessage(text);
+      lockInput(true);
+
+      const lc = text.toLowerCase();
+
+      // Route based on current state + keywords
+      if (appState.status === STATE.DRAFT) {
+        if (lc.includes('balance') || lc.includes('entitlement')) {
+          await handleBalanceQuery();
+        } else if (lc.includes('eligible') || lc.includes('childcare')) {
+          await handleEligibilityQuery();
+        } else {
+          // Main leave planning flow
+          await handleLeaveRequest();
+        }
+      } else if (appState.status === STATE.PENDING_MANAGER_APPROVAL ||
+                 appState.status === STATE.EMPLOYEE_CONFIRMED) {
+        appendAgentMessage("I'm waiting for the manager to approve your request. You can see the approval panel on the right. ⏸");
+        lockInput(false);
+      } else if (appState.status === STATE.SUBMITTED) {
+        appendAgentMessage("Your leave has already been submitted! Reference ID: <strong class='ref-id' style='color:var(--accent2); font-family:monospace'>" + DEMO.refId + "</strong>. Is there anything else I can help you with?");
+        lockInput(false);
+      } else if (appState.status === STATE.EMPLOYEE_CONFIRMED) {
+        appendAgentMessage("Your request is confirmed and pending manager approval.");
+        lockInput(false);
+      } else {
+        // Check for confirmation keywords after a recommendation
+        if (appState.step === 2 &&
+            (lc.includes('yes') || lc.includes('proceed') || lc.includes('sounds') || lc.includes('confirm') || lc.includes('submit') || lc.includes('go ahead') || lc.includes('ok') || lc.includes('great'))) {
+          await handleConfirmation();
+        } else {
+          appendAgentMessage("Sure — let me help with that. For the demo, please use the main leave request scenario or try the quick prompt buttons.");
+          lockInput(false);
+        }
+      }
+    }
+
+    // ─── Balance-only query ───────────────────────────────────────────────────
+    async function handleBalanceQuery() {
+      showTyping();
+      await runActivitySequence([
+        ['working', '🔍', 'Retrieving employee profile...', 300],
+        ['ok', '✓', 'Profile found — Alex Tan, TEAM_PLATFORM', 900],
+        ['working', '🔍', 'Fetching leave entitlements...', 1400],
+        ['ok', '✓', 'Entitlements loaded', 2000],
+      ]);
+      setTimeout(() => {
+        appendAgentMessage(`Here's your current leave balance, Alex:<br><br>
+          <strong>Annual Leave:</strong> 12 days remaining (20 entitled, 8 used)<br>
+          <strong>Childcare Leave:</strong> 5 days remaining (6 entitled, 1 used)<br><br>
+          Would you like help planning when to use them?`);
+        lockInput(false);
+      }, 2400);
+    }
+
+    // ─── Eligibility-only query ────────────────────────────────────────────────
+    async function handleEligibilityQuery() {
+      showTyping();
+      await runActivitySequence([
+        ['working', '🔍', 'Retrieving employee profile...', 300],
+        ['ok', '✓', 'Profile found — Alex Tan', 800],
+        ['working', '🔍', 'Checking dependent data...', 1200],
+        ['ok', '✓', 'Child age 6 confirmed — under 7 threshold', 1700],
+        ['ok', '✓', 'Childcare Leave eligibility: ELIGIBLE', 2100],
+      ]);
+      setTimeout(() => {
+        appendAgentMessage(`Yes — you're eligible for <strong>Childcare Leave</strong>. You have a child aged 6 (under 7), so you qualify under Singapore MOM policy.<br><br>
+          You currently have <strong>5 days remaining</strong> out of your 6-day annual entitlement.<br><br>
+          Would you like to plan some Childcare Leave?`);
+        lockInput(false);
+      }, 2500);
+    }
+
+    // ─── Main leave planning flow ─────────────────────────────────────────────
+    async function handleLeaveRequest() {
+      appState.step = 1;
+      showTyping();
+
+      // Activity: HR context
+      await runActivitySequence([
+        ['working', '🔍', 'Retrieving employee profile (E001)...', 400],
+        ['ok',      '✓',  'Profile found — Alex Tan, TEAM_PLATFORM, PROJECT_ALPHA', 1000],
+        ['working', '🔍', 'Checking dependents...', 1400],
+        ['ok',      '✓',  'Child age 6 — Childcare Leave eligibility confirmed', 1900],
+        ['working', '🔍', 'Fetching leave entitlements...', 2300],
+        ['ok',      '✓',  'Annual Leave: 12 days remaining', 2800],
+        ['ok',      '✓',  'Childcare Leave: 5 days remaining', 3100],
+      ]);
+
+      // Activity: Team + project context
+      await runActivitySequence([
+        ['working', '🔍', 'Checking team availability 14–16 Oct...', 3600],
+        ['fail',    '✗',  'Coverage RISK — 2 of 3 required members available', 4300],
+        ['working', '🔍', 'Fetching project events 14–16 Oct...', 4700],
+        ['fail',    '✗',  'Conflict: Production deployment on 16 Oct (PROJECT_ALPHA)', 5400],
+        ['info',    '⚠',  '14–16 Oct has advisory constraints (coverage + deployment)', 5900],
+      ]);
+
+      // Activity: Alternative search
+      await runActivitySequence([
+        ['working', '🔍', 'Dates are flexible — searching viable alternatives within 14 days...', 6400],
+        ['ok',      '✓',  'Checking 14 nearby date ranges...', 7000],
+        ['ok',      '✓',  'Pre-filtering: balance OK, coverage OK, no blackout', 7500],
+        ['ok',      '✓',  'Found 3 viable candidate ranges', 8000],
+        ['rec',     '→',  'Comparing candidates: 21–23 Oct is conflict-free', 8600],
+        ['rec',     '→',  'Recommended: 21–23 Oct 2026 (Childcare Leave)', 9000],
+      ]);
+
+      setTimeout(() => {
+        const recCard = `
+          <div class="rec-card">
+            <div class="rec-title">📋 Recommendation</div>
+            <div class="rec-row">
+              <span class="rec-label">Leave type</span>
+              <span class="rec-value">Childcare Leave</span>
+            </div>
+            <div class="rec-row">
+              <span class="rec-label">Dates</span>
+              <span class="rec-value">21–23 Oct 2026</span>
+            </div>
+            <div class="rec-row">
+              <span class="rec-label">Working days</span>
+              <span class="rec-value">3</span>
+            </div>
+            <div class="rec-row">
+              <span class="rec-label">Balance after</span>
+              <span class="rec-value">2 days remaining</span>
+            </div>
+            <div class="rec-reason">
+              <strong>Why not 14–16 Oct?</strong> Team coverage falls below the 3-person minimum (2 available) and there is a production deployment on 16 Oct for PROJECT_ALPHA.<br><br>
+              <strong>Why 21–23 Oct?</strong> Full team coverage, no project milestones or deployment windows. You qualify for Childcare Leave (child age 6), so I'm recommending that over Annual Leave to preserve your AL balance.
+            </div>
+          </div>
+          <div class="confirm-row" style="margin-top:8px;">
+            <button class="btn-confirm yes" onclick="handleConfirmation()" id="btnYes">✓ Confirm &amp; request approval</button>
+            <button class="btn-confirm no" onclick="declineRec()">✗ Different dates</button>
+          </div>`;
+
+        appendAgentMessage(
+          `I checked your entitlements, team availability, and project calendar for <strong>14–16 Oct</strong>.<br><br>
+           I found two issues: coverage is below the team minimum, and there's a production deployment on 16 Oct.<br><br>
+           I searched nearby dates and recommend <strong>21–23 Oct</strong> on <strong>Childcare Leave</strong> instead:`,
+          recCard
+        );
+
+        appState.step = 2;
+        lockInput(false);
+      }, 9400);
+    }
+
+    // ─── Employee confirmation ─────────────────────────────────────────────────
+    async function handleConfirmation() {
+      // Disable confirm buttons
+      const btn = document.getElementById('btnYes');
+      if (btn) btn.disabled = true;
+      const btnNo = document.querySelector('.btn-confirm.no');
+      if (btnNo) btnNo.disabled = true;
+
+      lockInput(true);
+      appState.status = STATE.EMPLOYEE_CONFIRMED;
+
+      showTyping();
+      await addActivity('ok', '✓', 'Employee confirmed — transitioning to EMPLOYEE_CONFIRMED', 400);
+      await addActivity('working', '📤', 'Requesting manager approval from Sarah Lim...', 900);
+      await addActivity('waiting', '⏸', 'Status: PENDING_MANAGER_APPROVAL', 1400);
+
+      setTimeout(() => {
+        appendAgentMessage(
+          `Got it! I've sent an approval request to your manager <strong>Sarah Lim</strong>.<br><br>
+           The request is now <span class="status-chip pending"><span class="chip-dot"></span>Pending Approval</span><br><br>
+           You can see the approval card on the right panel. I'll update you once Sarah responds.`
+        );
+        appState.status = STATE.PENDING_MANAGER_APPROVAL;
+        showApprovalCard();
+        lockInput(true);
+      }, 1800);
+    }
+
+    function declineRec() {
+      appendAgentMessage("No problem! What dates would work better for you? I can search a different window.");
+      appState.step = 0;
+      appState.status = STATE.DRAFT;
+      lockInput(false);
+    }
+
+    // ─── Manager approval card ─────────────────────────────────────────────────
+    function showApprovalCard() {
+      document.getElementById('apr-employee').textContent = DEMO.employee;
+      document.getElementById('apr-type').textContent = DEMO.leaveType;
+      document.getElementById('apr-dates').textContent = DEMO.recDates;
+      document.getElementById('apr-days').textContent = DEMO.days + ' days';
+      document.getElementById('apr-balance').textContent = DEMO.balanceAfter + ' days remaining after';
+      document.getElementById('apr-conflicts').innerHTML = `
+        <div>
+          <span class="conflict-tag risk">✗ Coverage RISK 14–16 Oct</span>
+          <span class="conflict-tag warn">⚠ Deployment 16 Oct</span>
+          <span class="conflict-tag ok">✓ 21–23 Oct conflict-free</span>
+        </div>`;
+      document.getElementById('apr-rationale').textContent =
+        'Childcare Leave recommended over Annual Leave — child age 6 qualifies. 21–23 Oct has full team coverage and no project events.';
+      document.getElementById('approvalSection').classList.add('visible');
+    }
+
+    async function managerApprove() {
+      document.getElementById('btnApprove').disabled = true;
+      document.getElementById('btnReject').disabled = true;
+      appState.status = STATE.APPROVED;
+
+      await addActivity('ok', '✓', 'Manager Sarah Lim: APPROVED', 200);
+      await addActivity('working', '📡', 'Invoking submit_leave() → mocked AskHR/SuccessFactors...', 700);
+      await addActivity('ok', '✓', 'Leave submitted — reference ' + DEMO.refId, 1400);
+      await addActivity('done', '🎉', 'Status: SUBMITTED', 1800);
+
+      setTimeout(() => {
+        const banner = `
+          <div class="confirmation-banner">
+            <div class="banner-title">✅ Leave Submitted</div>
+            <div style="margin-bottom:6px;">Your leave has been recorded in the system.</div>
+            <div class="rec-row" style="margin-bottom:4px; font-size:12.5px; display:flex; justify-content:space-between;">
+              <span style="color:var(--muted)">Leave Type</span><span style="font-weight:600">${DEMO.leaveType}</span>
+            </div>
+            <div class="rec-row" style="margin-bottom:4px; font-size:12.5px; display:flex; justify-content:space-between;">
+              <span style="color:var(--muted)">Dates</span><span style="font-weight:600">${DEMO.recDates}</span>
+            </div>
+            <div class="rec-row" style="margin-bottom:4px; font-size:12.5px; display:flex; justify-content:space-between;">
+              <span style="color:var(--muted)">Working Days</span><span style="font-weight:600">${DEMO.days} days</span>
+            </div>
+            <div class="rec-row" style="margin-bottom:4px; font-size:12.5px; display:flex; justify-content:space-between;">
+              <span style="color:var(--muted)">Status</span><span class="status-chip approved" style="font-size:11px; padding:2px 8px;"><span class="chip-dot"></span>Approved</span>
+            </div>
+            <div style="margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.06); font-size:12px; color:var(--muted)">
+              Reference ID: <span class="ref-id">${DEMO.refId}</span>
+            </div>
+          </div>`;
+
+        appendAgentMessage(
+          `Great news! Sarah has <strong>approved</strong> your leave request. I've submitted it to the HR system. 🎉`,
+          banner
+        );
+        appState.status = STATE.SUBMITTED;
+        document.getElementById('approvalSection').classList.remove('visible');
+        lockInput(false);
+      }, 2200);
+    }
+
+    async function managerReject() {
+      document.getElementById('btnApprove').disabled = true;
+      document.getElementById('btnReject').disabled = true;
+      appState.status = STATE.REJECTED;
+
+      await addActivity('fail', '✗', 'Manager Sarah Lim: REJECTED', 200);
+      await addActivity('info', 'ℹ', 'submit_leave() not called — approval_status != APPROVED', 600);
+
+      setTimeout(() => {
+        appendAgentMessage(
+          `Sarah has <strong>rejected</strong> the request. No leave has been submitted.<br><br>
+           Would you like to request a different date range or explore other options?`
+        );
+        document.getElementById('approvalSection').classList.remove('visible');
+        appState.status = STATE.DRAFT;
+        appState.step = 0;
+        lockInput(false);
+      }, 1000);
+    }
+
+    // ─── Demo reset ────────────────────────────────────────────────────────────
+    function resetDemo() {
+      // Reset state
+      appState = { status: STATE.DRAFT, step: 0, inputLocked: false };
+
+      // Clear messages
+      const msgs = document.getElementById('messages');
+      msgs.innerHTML = `
+        <div class="msg agent">
+          <div class="msg-avatar">A</div>
+          <div class="msg-body">
+            <div class="msg-bubble">
+              Hi! I'm your leave planning assistant. I can help you find the best time to take leave by checking your entitlements, team availability, and project milestones.<br><br>
+              What are you planning?
+            </div>
+            <div class="msg-time">Just now</div>
+          </div>
+        </div>`;
+
+      // Clear activity log
+      const log = document.getElementById('activityLog');
+      log.innerHTML = `
+        <div class="activity-empty" id="activityEmpty">
+          <div class="empty-icon">🤖</div>
+          <div class="empty-text">Agent tool calls and reasoning steps will appear here during the demo.</div>
+        </div>`;
+
+      // Reset approval section
+      document.getElementById('approvalSection').classList.remove('visible');
+      document.getElementById('btnApprove').disabled = false;
+      document.getElementById('btnReject').disabled = false;
+
+      // Restore quick prompts
+      const qp = document.getElementById('quickPrompts');
+      qp.style.display = 'flex';
+
+      // Unlock input
+      lockInput(false);
+      document.getElementById('chatInput').value = '';
+    }
+  </script>
 
 </body>
 </html>

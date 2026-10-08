@@ -225,10 +225,9 @@ def find_viable_date_ranges(
     cal = profile["holiday_calendar_code"]
     year_end = date(preferred.year, 12, 31)
 
-    # Build an outward-ordered list of candidate start dates: preferred, +1, -1, +2 ...
-    offsets = [0]
-    for i in range(1, search_days + 1):
-        offsets.extend([i, -i])
+    # Search forward from the preferred start first (people rarely want
+    # earlier-than-requested dates), then fall back to earlier days.
+    offsets = list(range(0, search_days + 1)) + [-i for i in range(1, search_days + 1)]
 
     candidates: list[dict[str, Any]] = []
     seen: set[date] = set()

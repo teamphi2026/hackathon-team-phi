@@ -1,8 +1,7 @@
 """FastAPI application entry point.
 
-Task 1 / Phase 0 skeleton: dummy routes so the app runs end-to-end before
-the tool layer, orchestrator, and email service are implemented. Later tasks
-replace the dummy bodies with real behaviour.
+Wires the orchestrator agent, the approval token callback, session-state
+polling for the manager UI, the Agent Activity SSE stream, and a demo reset.
 
 Run with:
     uvicorn backend.main:app --reload
@@ -17,11 +16,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from . import agent, email_service
 from .state import get_session
+from .tools import actions
 
 app = FastAPI(title="Project-Aware Leave Planning Agent")
 
-# Permit the static UI / Vercel frontend to call the API during the demo.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -40,28 +40,25 @@ def health() -> dict[str, str]:
 
 
 @app.post("/api/chat")
-def chat(req: ChatRequest) -> dict[str, str]:
-    """Dummy chat endpoint — replaced by the orchestrator in a later task."""
-    session = get_session()
-    session.log_activity("waiting", f"Received: {req.message!r}")
-    return {
-        "reply": (
-            "Backend skeleton is live. The orchestrator agent is not wired up "
-            "yet — this is a placeholder response."
-        ),
-        "user_id": session.session_user_id,
-    }
+def chat(req: ChatRequest) -> dict:
+    """Main chat endpoint — delegates to the orchestrator agent."""
+    return agent.handle_message(req.message)
 
 
 @app.post("/api/approval/{token}")
-def approval(token: str, action: str = "approve") -> dict[str, str]:
-    """Stub for the manager Approve/Reject token callback."""
-    return {
-        "status": "stub",
-        "token": token,
-        "action": action,
-        "message": "Approval handler not implemented yet.",
-    }
+def approval(token: str, action: str = "approve") -> dict:
+    """Manager Approve/Reject token callback.
+
+    Applies the decision via the state machine, then emails the employee.
+    """
+    result = actions.handle_approval_token(token, action)
+    if result.get("success"):
+        eid = result["employee_time_id"]
+        if result["action"] == "approve":
+            email_service.send_confirmation_email(eid)
+        else:
+            email_service.send_rejection_email(eid, reason="Rejected by manager")
+    return result
 
 
 @app.get("/api/session-state")
@@ -74,6 +71,7 @@ def session_state() -> dict:
         "employee_time_id": s.employee_time_id,
         "approval_status": s.approval_status,
         "reference_id": s.reference_id,
+        "activity": s.activity,
     }
 
 
@@ -90,8 +88,7 @@ async def activity_stream() -> StreamingResponse:
     async def event_gen():
         session = get_session()
         last = 0
-        # Emit a short-lived stream for the demo; the UI reconnects as needed.
-        for _ in range(600):  # ~5 min at 0.5s cadence
+        for _ in range(1200):  # ~10 min at 0.5s cadence
             events = session.activity[last:]
             for ev in events:
                 yield f"data: {json.dumps(ev)}\n\n"

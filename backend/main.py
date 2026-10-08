@@ -11,12 +11,14 @@ from __future__ import annotations
 import asyncio
 import json
 
-from fastapi import FastAPI
+from typing import Optional
+
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from . import agent, email_service
+from . import agent, auth, email_service
 from .state import get_session
 from .tools import actions
 
@@ -30,8 +32,47 @@ app.add_middleware(
 )
 
 
+# ---------------------------------------------------------------------------
+# Identity: resolve the logged-in employee from the bearer token and pin the
+# session to them. The LLM/tools read identity from the session, never input.
+# ---------------------------------------------------------------------------
+
+def _bearer(authorization: str | None) -> str | None:
+    if not authorization:
+        return None
+    parts = authorization.split()
+    if len(parts) == 2 and parts[0].lower() == "bearer":
+        return parts[1]
+    return authorization
+
+
+def _require_identity(authorization: str | None) -> str:
+    """Resolve + apply the session identity, or 401 if the token is invalid."""
+    token = _bearer(authorization)
+    user_id = auth.user_id_for_token(token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+    s = get_session()
+    if s.session_user_id != user_id:
+        # Switching identity starts a clean session for that user.
+        s.reset()
+        s.session_user_id = user_id
+    return user_id
+
+
 class ChatRequest(BaseModel):
     message: str
+
+
+class Credentials(BaseModel):
+    username: str
+    password: str
+
+
+class Registration(BaseModel):
+    username: str
+    password: str
+    user_id: str
 
 
 @app.get("/api/health")
@@ -39,9 +80,41 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+# ---------------------------------------------------------------------------
+# Auth endpoints
+# ---------------------------------------------------------------------------
+
+@app.post("/api/register")
+def register(req: Registration) -> dict:
+    result = auth.register(req.username, req.password, req.user_id)
+    if not result.get("success"):
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@app.post("/api/login")
+def login(req: Credentials) -> dict:
+    result = auth.login(req.username, req.password)
+    if not result.get("success"):
+        raise HTTPException(status_code=401, detail=result["error"])
+    return result
+
+
+@app.post("/api/logout")
+def logout(authorization: Optional[str] = Header(default=None)) -> dict:
+    return auth.logout(_bearer(authorization) or "")
+
+
+@app.get("/api/me")
+def me(authorization: Optional[str] = Header(default=None)) -> dict:
+    user_id = _require_identity(authorization)
+    return auth.user_info(user_id)
+
+
 @app.post("/api/chat")
-def chat(req: ChatRequest) -> dict:
+def chat(req: ChatRequest, authorization: Optional[str] = Header(default=None)) -> dict:
     """Main chat endpoint — delegates to the orchestrator agent."""
+    _require_identity(authorization)
     return agent.handle_message(req.message)
 
 
@@ -66,12 +139,13 @@ class UIApproval(BaseModel):
 
 
 @app.post("/api/ui-approval")
-def ui_approval(req: UIApproval) -> dict:
+def ui_approval(req: UIApproval, authorization: Optional[str] = Header(default=None)) -> dict:
     """Manager decision made in the UI card (not via an email token).
 
     Acts on the session's current pending request. Mirrors the token path:
     applies the state transition then emails the employee.
     """
+    _require_identity(authorization)
     s = get_session()
     if not s.reference_id:
         return {"success": False, "message": "No pending request to decide on."}
@@ -86,8 +160,9 @@ def ui_approval(req: UIApproval) -> dict:
 
 
 @app.get("/api/session-state")
-def session_state() -> dict:
+def session_state(authorization: Optional[str] = Header(default=None)) -> dict:
     """Snapshot of workflow state for the manager approval UI card."""
+    _require_identity(authorization)
     s = get_session()
     return {
         "user_id": s.session_user_id,

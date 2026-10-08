@@ -48,6 +48,10 @@ class SessionState:
     # activity log for the Agent Activity panel
     activity: list[dict[str, Any]] = field(default_factory=list)
 
+    # LLM conversation history (OpenAI message dicts) — gives the agent memory
+    # of earlier turns within the session.
+    conversation: list[dict[str, Any]] = field(default_factory=list)
+
     def reset(self) -> None:
         """Reset to a fresh demo state (used by the Demo Reset button)."""
         fresh = SessionState(session_user_id=self.session_user_id)

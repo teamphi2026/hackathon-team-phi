@@ -570,8 +570,9 @@
       Leave Agent
     </div>
     <div class="nav-right">
-      <span class="badge-nav">IBM Hackathon 2026 · Team Phi</span>
+      <span class="badge-nav" id="userBadge">…</span>
       <button class="btn-reset" onclick="resetDemo()">↺ Reset Demo</button>
+      <button class="btn-reset" onclick="logout()">Log out</button>
     </div>
   </nav>
 
@@ -806,6 +807,44 @@
     const API_BASE = (window.LEAVE_API_BASE || DEFAULT_API_BASE).replace(/\/$/, '');
     const api = (path) => `${API_BASE}${path}`;
 
+    // --- Auth: token stored in localStorage, sent as a Bearer header ---------
+    const authToken = () => localStorage.getItem('leave_token');
+
+    function requireLogin() {
+      if (!authToken()) { window.location.href = 'login.html'; return false; }
+      return true;
+    }
+
+    // fetch wrapper that attaches the bearer token and redirects on 401.
+    async function authFetch(path, opts = {}) {
+      const headers = Object.assign({}, opts.headers || {});
+      const t = authToken();
+      if (t) headers['Authorization'] = 'Bearer ' + t;
+      const res = await fetch(api(path), Object.assign({}, opts, { headers }));
+      if (res.status === 401) {
+        localStorage.removeItem('leave_token');
+        window.location.href = 'login.html';
+        throw new Error('Session expired — please log in again.');
+      }
+      return res;
+    }
+
+    async function logout() {
+      try { await authFetch('/api/logout', { method: 'POST' }); } catch (e) {}
+      localStorage.removeItem('leave_token');
+      window.location.href = 'login.html';
+    }
+
+    // Gate the page: redirect to login if not authenticated, else greet by name.
+    window.addEventListener('DOMContentLoaded', async () => {
+      if (!requireLogin()) return;
+      try {
+        const me = await (await authFetch('/api/me')).json();
+        const badge = document.getElementById('userBadge');
+        if (badge) badge.textContent = me.display_name + ' (' + me.user_id + ')';
+      } catch (e) { /* redirect handled by authFetch */ }
+    });
+
     // Icon per activity status emitted by the backend.
     const ACTIVITY_ICON = {
       ok: '✓', fail: '✗', working: '🔍', info: 'ℹ',
@@ -857,7 +896,7 @@
       showTyping();
 
       try {
-        const res = await fetch(api('/api/chat'), {
+        const res = await authFetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message: text }),
@@ -886,7 +925,7 @@
     // --- Populate the manager approval card from backend data ----------------
     async function showApprovalCardFromBackend(refId) {
       try {
-        const res = await fetch(api('/api/session-state'));
+        const res = await authFetch('/api/session-state');
         const st = await res.json();
         document.getElementById('apr-dates').textContent = refId || st.reference_id || '—';
         document.getElementById('apr-type').textContent = 'Pending request';
@@ -904,7 +943,7 @@
     // --- Resolve a live approval token from the backend ----------------------
     async function fetchApprovalToken(action) {
       // The backend exposes tokens through session-state for the demo UI path.
-      const res = await fetch(api('/api/session-state'));
+      const res = await authFetch('/api/session-state');
       const st = await res.json();
       return { refId: st.reference_id, action };
     }
@@ -925,13 +964,13 @@
     async function callApproval(action) {
       try {
         // The UI card uses the dedicated UI-decision endpoint keyed by reference id.
-        const res = await fetch(api('/api/ui-approval'), {
+        const res = await authFetch('/api/ui-approval', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action }),
         });
         const data = await res.json();
-        renderActivity((await (await fetch(api('/api/session-state'))).json()).activity);
+        renderActivity((await (await authFetch('/api/session-state')).json()).activity);
         if (data.success) {
           if (action === 'approve') {
             appendAgentMessage(`Your leave was <strong>approved</strong>. Reference ` +
@@ -954,7 +993,7 @@
     const _mockReset = resetDemo;
     async function resetDemo() {
       renderedActivity = 0;
-      try { await fetch(api('/api/reset'), { method: 'POST' }); } catch (e) { /* ignore */ }
+      try { await authFetch('/api/reset', { method: 'POST' }); } catch (e) { /* ignore */ }
       _mockReset();
     }
   </script>

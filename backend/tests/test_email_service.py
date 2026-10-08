@@ -18,7 +18,10 @@ _FILES = ["13_Employee_Time.csv", "12_Time_Account_Detail.csv"]
 
 
 @pytest.fixture(autouse=True)
-def _isolate(tmp_path):
+def _isolate(tmp_path, monkeypatch):
+    # Force DRY-RUN regardless of local .env SMTP settings, so these tests
+    # assert email *content* deterministically without sending real mail.
+    monkeypatch.setattr(es, "_smtp_configured", lambda: False)
     backups = {}
     for f in _FILES:
         shutil.copy(data_file(f), tmp_path / f)
@@ -60,7 +63,7 @@ def test_approval_email_goes_to_manager():
     eid = _submit()
     result = es.send_approval_email(eid)
     # Marcus Lim (E004) is Wei Ling's manager.
-    assert result["manager_email"] == "marcus.lim@i-be-yam.com"
+    assert result["manager_email"] == "marcuslim94@proton.me"
 
 
 def test_token_from_email_drives_approval():

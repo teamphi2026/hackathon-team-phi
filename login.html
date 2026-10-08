@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="config.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign in · Leave Planning Agent</title>
+  <style>
+    :root {
+      --bg: #0b0f1a; --panel: #121829; --border: rgba(255,255,255,0.08);
+      --text: #e8ecf5; --muted: #94a3b8; --accent: #6c63ff; --accent2: #22d3ee;
+      --green: #22c55e; --red: #ef4444;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; display: flex; align-items: center;
+      justify-content: center; font-family: -apple-system, BlinkMacSystemFont,
+      'Segoe UI', Roboto, sans-serif; background: radial-gradient(1200px 600px at 50% -10%,
+      rgba(108,99,255,0.15), transparent), var(--bg); color: var(--text); padding: 20px;
+    }
+    .card {
+      width: 100%; max-width: 400px; background: var(--panel);
+      border: 1px solid var(--border); border-radius: 16px; padding: 32px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    }
+    .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+    .brand .logo {
+      width: 34px; height: 34px; border-radius: 9px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: flex; align-items: center; justify-content: center; font-size: 18px;
+    }
+    .brand h1 { font-size: 17px; margin: 0; font-weight: 650; }
+    .sub { color: var(--muted); font-size: 13px; margin: 2px 0 22px; }
+    .tabs { display: flex; gap: 6px; margin-bottom: 20px; }
+    .tab {
+      flex: 1; padding: 9px; text-align: center; border-radius: 9px; cursor: pointer;
+      font-size: 13px; color: var(--muted); background: transparent;
+      border: 1px solid var(--border);
+    }
+    .tab.active { color: var(--text); background: rgba(108,99,255,0.14); border-color: var(--accent); }
+    label { display: block; font-size: 12px; color: var(--muted); margin: 14px 0 6px; }
+    input {
+      width: 100%; padding: 11px 12px; border-radius: 9px; border: 1px solid var(--border);
+      background: #0e1322; color: var(--text); font-size: 14px; outline: none;
+    }
+    input:focus { border-color: var(--accent); }
+    button.submit {
+      width: 100%; margin-top: 20px; padding: 12px; border: none; border-radius: 9px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+    }
+    button.submit:disabled { opacity: 0.6; cursor: default; }
+    .msg { margin-top: 14px; font-size: 13px; min-height: 18px; }
+    .msg.error { color: var(--red); }
+    .msg.ok { color: var(--green); }
+    .hint { margin-top: 18px; font-size: 11.5px; color: var(--muted); line-height: 1.6;
+      border-top: 1px solid var(--border); padding-top: 14px; }
+    .hint code { background: rgba(255,255,255,0.06); padding: 1px 5px; border-radius: 4px; }
+    .form { display: none; }
+    .form.active { display: block; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="brand">
+      <div class="logo">🗓️</div>
+      <h1>Leave Planning Agent</h1>
+    </div>
+    <div class="sub">Project-aware leave planning · IBM Hackathon 2026</div>
+
+    <div class="tabs">
+      <div class="tab active" id="tab-login" onclick="switchTab('login')">Sign in</div>
+      <div class="tab" id="tab-register" onclick="switchTab('register')">Register</div>
+    </div>
+
+    <!-- Login -->
+    <form class="form active" id="form-login" onsubmit="return doLogin(event)">
+      <label for="l-user">Username</label>
+      <input id="l-user" autocomplete="username" placeholder="weiling" />
+      <label for="l-pass">Password</label>
+      <input id="l-pass" type="password" autocomplete="current-password" placeholder="••••••••" />
+      <button class="submit" type="submit">Sign in</button>
+      <div class="msg" id="l-msg"></div>
+    </form>
+
+    <!-- Register -->
+    <form class="form" id="form-register" onsubmit="return doRegister(event)">
+      <label for="r-user">Username</label>
+      <input id="r-user" autocomplete="username" placeholder="choose a username" />
+      <label for="r-pass">Password</label>
+      <input id="r-pass" type="password" autocomplete="new-password" placeholder="choose a password" />
+      <label for="r-emp">Employee ID (maps to an existing employee)</label>
+      <input id="r-emp" placeholder="e.g. E006" />
+      <button class="submit" type="submit">Create account</button>
+      <div class="msg" id="r-msg"></div>
+    </form>
+
+    <div class="hint">
+      Demo accounts (password <code>password</code>): <code>weiling</code> (E005),
+      <code>marcus</code> (E004), <code>fatimah</code> (E009).<br>
+      Register maps a new login to an existing employee id so leave data resolves.
+    </div>
+  </div>
+
+  <script>
+    // On localhost, talk to the local FastAPI server. When deployed, use the backend URL
+    // from config.js (empty = same origin).
+    const IS_LOCAL = ['localhost', '127.0.0.1', ''].includes(window.location.hostname);
+    const DEFAULT_API_BASE = IS_LOCAL ? 'http://localhost:8000' : '';
+    const API_BASE = (window.LEAVE_API_BASE || DEFAULT_API_BASE).replace(/\/$/, '');
+    const api = (p) => `${API_BASE}${p}`;
+
+    // Clear message when the backend can't be reached (most often: LEAVE_API_BASE unset in production).
+    function backendHelp() {
+      return IS_LOCAL
+        ? 'Could not reach the backend. Is it running on ' + API_BASE + '?'
+        : 'Could not reach the backend API. Set LEAVE_API_BASE in config.js to the deployed backend URL.';
+    }
+    // Already logged in? Go straight to the app.
+    if (localStorage.getItem('leave_token')) window.location.href = 'index.html';
+
+    function switchTab(which) {
+      document.getElementById('tab-login').classList.toggle('active', which === 'login');
+      document.getElementById('tab-register').classList.toggle('active', which === 'register');
+      document.getElementById('form-login').classList.toggle('active', which === 'login');
+      document.getElementById('form-register').classList.toggle('active', which === 'register');
+    }
+
+    function show(id, text, cls) {
+      const el = document.getElementById(id);
+      el.textContent = text; el.className = 'msg ' + (cls || '');
+    }
+
+    async function doLogin(e) {
+      e.preventDefault();
+      const username = document.getElementById('l-user').value.trim();
+      const password = document.getElementById('l-pass').value;
+      show('l-msg', 'Signing in…', '');
+      try {
+        const res = await fetch(api('/api/login'), {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password }),
+        });
+        const data = await res.json();
+        if (!res.ok) { show('l-msg', data.detail || 'Login failed.', 'error'); return false; }
+        localStorage.setItem('leave_token', data.token);
+        window.location.href = 'index.html';
+      } catch (err) {
+        show('l-msg', backendHelp(), 'error');
+      }
+      return false;
+    }
+
+    async function doRegister(e) {
+      e.preventDefault();
+      const username = document.getElementById('r-user').value.trim();
+      const password = document.getElementById('r-pass').value;
+      const user_id = document.getElementById('r-emp').value.trim().toUpperCase();
+      show('r-msg', 'Creating account…', '');
+      try {
+        const res = await fetch(api('/api/register'), {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password, user_id }),
+        });
+        const data = await res.json();
+        if (!res.ok) { show('r-msg', data.detail || 'Registration failed.', 'error'); return false; }
+        show('r-msg', 'Account created for ' + data.display_name + '. You can sign in now.', 'ok');
+        setTimeout(() => { switchTab('login'); document.getElementById('l-user').value = username; }, 900);
+      } catch (err) {
+        show('r-msg', backendHelp(), 'error');
+      }
+      return false;
+    }
+  </script>
+</body>
+</html>

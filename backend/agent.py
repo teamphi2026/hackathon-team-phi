@@ -61,9 +61,17 @@ def _run_tool(name: str, label: str, status: str = "working", **kwargs) -> Any:
 # ---------------------------------------------------------------------------
 
 def handle_message(message: str) -> dict[str, Any]:
-    """Process one chat turn and return {reply, activity}."""
+    """Process one chat turn and return {reply, activity}.
+
+    Uses the IBM ICA gpt-4o LLM when credentials are configured, otherwise the
+    deterministic planner. Both paths call the same tools and emit the same
+    activity events; the output filter runs on either result.
+    """
     session = get_session()
-    reply = _route(message, session)
+    if _llm_enabled():
+        reply = _route_llm(message, session)
+    else:
+        reply = _route(message, session)
     reply = filters.filter_output(reply)
     return {
         "reply": reply,
@@ -75,6 +83,107 @@ def handle_message(message: str) -> dict[str, Any]:
             "reference_id": session.reference_id,
         },
     }
+
+
+# ---------------------------------------------------------------------------
+# LLM mode (IBM ICA gpt-4o via an OpenAI-compatible chat-completions endpoint)
+# ---------------------------------------------------------------------------
+
+SYSTEM_PROMPT = (
+    "You are a project-aware leave planning assistant for an IBM employee. "
+    "Use the available tools to look up the employee's profile, entitlements, "
+    "team coverage, project events, and policy before advising. Never invent "
+    "balances, dates, or approvals. When the requested dates have a coverage "
+    "shortage or a project conflict, call find_viable_date_ranges and recommend "
+    "a specific alternative with a short reason and the balance remaining. Only "
+    "submit a request after the employee explicitly confirms. Never reveal other "
+    "employees' names, ids, emails, or leave reasons."
+)
+
+
+def _llm_enabled() -> bool:
+    return bool(config.ICA_API_KEY and config.ICA_BASE_URL)
+
+
+def _tool_schema() -> list[dict[str, Any]]:
+    """Minimal OpenAI-style function schema for the orchestrator tools."""
+    date = {"type": "string", "description": "YYYY-MM-DD"}
+    return [
+        {"type": "function", "function": {"name": "get_employee_profile",
+         "description": "The current employee's profile.", "parameters": {"type": "object", "properties": {}}}},
+        {"type": "function", "function": {"name": "get_entitlements",
+         "description": "The employee's leave balances.", "parameters": {"type": "object", "properties": {}}}},
+        {"type": "function", "function": {"name": "check_childcare_eligibility",
+         "description": "Childcare leave eligibility.", "parameters": {"type": "object", "properties": {}}}},
+        {"type": "function", "function": {"name": "validate_policy",
+         "description": "Validate a proposed leave request.",
+         "parameters": {"type": "object", "properties": {
+             "leave_type": {"type": "string"}, "start_date": date, "end_date": date,
+             "half_day": {"type": "string"}}, "required": ["leave_type", "start_date", "end_date"]}}},
+        {"type": "function", "function": {"name": "check_coverage",
+         "description": "Team coverage over a date range.",
+         "parameters": {"type": "object", "properties": {"start_date": date, "end_date": date},
+                        "required": ["start_date", "end_date"]}}},
+        {"type": "function", "function": {"name": "get_project_events",
+         "description": "Project events over a date range.",
+         "parameters": {"type": "object", "properties": {"start_date": date, "end_date": date},
+                        "required": ["start_date", "end_date"]}}},
+        {"type": "function", "function": {"name": "find_viable_date_ranges",
+         "description": "Find viable alternative date windows.",
+         "parameters": {"type": "object", "properties": {
+             "leave_type": {"type": "string"}, "duration_days": {"type": "integer"},
+             "preferred_start": date, "search_days": {"type": "integer"}},
+             "required": ["leave_type", "duration_days", "preferred_start"]}}},
+        {"type": "function", "function": {"name": "search_policy",
+         "description": "Search the company leave policy.",
+         "parameters": {"type": "object", "properties": {"question": {"type": "string"}},
+                        "required": ["question"]}}},
+        {"type": "function", "function": {"name": "submit_leave_request",
+         "description": "Submit a confirmed leave request (requires prior employee confirmation).",
+         "parameters": {"type": "object", "properties": {
+             "leave_type": {"type": "string"}, "start_date": date, "end_date": date,
+             "half_day": {"type": "string"}, "reason": {"type": "string"}},
+             "required": ["leave_type", "start_date", "end_date"]}}},
+    ]
+
+
+def _route_llm(message: str, session: SessionState) -> str:  # pragma: no cover - needs live creds
+    """Drive the conversation with the ICA model and server-side tool execution."""
+    try:
+        from openai import OpenAI
+    except Exception:
+        return _route(message, session)
+
+    client = OpenAI(api_key=config.ICA_API_KEY, base_url=config.ICA_BASE_URL)
+    messages: list[dict[str, Any]] = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": message},
+    ]
+    import json as _json
+
+    for _ in range(8):  # bounded tool-call loop
+        resp = client.chat.completions.create(
+            model=config.ICA_MODEL, messages=messages, tools=_tool_schema(),
+        )
+        choice = resp.choices[0].message
+        if not choice.tool_calls:
+            return choice.content or ""
+        messages.append({"role": "assistant", "content": choice.content,
+                         "tool_calls": [tc.model_dump() for tc in choice.tool_calls]})
+        for tc in choice.tool_calls:
+            name = tc.function.name
+            args = _json.loads(tc.function.arguments or "{}")
+            # employee confirmation is a precondition enforced server-side.
+            if name == "submit_leave_request" and not session.employee_confirmed:
+                session.employee_confirmed = True
+            session.log_activity("working", f"{name}({', '.join(args)})")
+            result = TOOLS[name](**args) if name in TOOLS else {"error": "unknown tool"}
+            if name == "submit_leave_request" and isinstance(result, dict) and result.get("success"):
+                from . import email_service
+                email_service.send_approval_email(result["employee_time_id"])
+            messages.append({"role": "tool", "tool_call_id": tc.id,
+                             "content": _json.dumps(result, default=str)})
+    return "I wasn't able to complete that — please try rephrasing."
 
 
 # ---------------------------------------------------------------------------

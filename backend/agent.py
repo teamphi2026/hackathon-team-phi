@@ -22,6 +22,7 @@ from typing import Any, Callable
 
 from . import config, filters
 from .state import SessionState, get_session
+from .tool_logger import call_tool
 from .tools import actions, hr, policy_rag
 from .tools import team_project as tp
 
@@ -49,11 +50,10 @@ _DATE = re.compile(r"(\d{4}-\d{2}-\d{2})")
 
 
 def _run_tool(name: str, label: str, status: str = "working", **kwargs) -> Any:
-    """Invoke a tool, logging it to the activity stream."""
+    """Invoke a tool, logging it to the activity stream and the debug log."""
     session = get_session()
     session.log_activity(status, label)
-    result = TOOLS[name](**kwargs)
-    return result
+    return call_tool(name, TOOLS[name], **kwargs)
 
 
 # ---------------------------------------------------------------------------
@@ -177,7 +177,7 @@ def _route_llm(message: str, session: SessionState) -> str:  # pragma: no cover 
             if name == "submit_leave_request" and not session.employee_confirmed:
                 session.employee_confirmed = True
             session.log_activity("working", f"{name}({', '.join(args)})")
-            result = TOOLS[name](**args) if name in TOOLS else {"error": "unknown tool"}
+            result = call_tool(name, TOOLS[name], **args) if name in TOOLS else {"error": "unknown tool"}
             if name == "submit_leave_request" and isinstance(result, dict) and result.get("success"):
                 from . import email_service
                 email_service.send_approval_email(result["employee_time_id"])

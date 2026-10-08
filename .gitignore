@@ -9,5 +9,8 @@ venv/
 # Env / secrets
 .env
 
+# Logs
+logs/
+
 # OS
 .DS_Store

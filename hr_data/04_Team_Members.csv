@@ -1,0 +1,19 @@
+membership_id,user_id,team_id,is_primary,role_in_team
+M001,E001,T01,Y,Managing Director
+M002,E002,T05,Y,HR Manager
+M003,E003,T05,Y,HR Executive
+M004,E004,T02,Y,Team lead
+M005,E005,T02,Y,Senior Software Engineer
+M006,E006,T02,Y,Software Engineer
+M007,E007,T02,Y,Software Engineer
+M008,E008,T02,Y,QA Engineer
+M009,E009,T03,Y,Team lead
+M010,E010,T03,Y,Account Executive
+M011,E011,T03,Y,Account Executive
+M012,E012,T03,Y,Sales Associate
+M013,E013,T04,Y,Team lead
+M014,E014,T04,Y,Operations Executive
+M015,E015,T04,Y,Operations Coordinator
+M016,E005,T04,N,Systems liaison
+M017,E014,T03,N,Sales operations support
+M018,E011,T05,N,Recruitment interviewer

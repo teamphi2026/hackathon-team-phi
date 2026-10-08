@@ -1,0 +1,19 @@
+employee_time_id,user_id,time_type_code,start_date,end_date,half_day,quantity_in_days,reason,approval_status,approver_id,submitted_at,decided_at,decision_note
+R001,E005,AL,2026-03-09,2026-03-13,None,5,Family trip,Approved,E004,2026-02-20 10:12,2026-02-21 09:30,
+R002,E006,AL,2026-04-20,2026-04-22,None,3,Personal errands,Approved,E004,2026-04-01 14:05,2026-04-02 08:50,
+R003,E007,AL,2026-05-04,2026-05-08,None,5,Holiday,Approved,E004,2026-04-10 11:20,2026-04-10 16:45,
+R004,E010,AL,2026-07-13,2026-07-17,None,5,Travel,Approved,E009,2026-06-15 09:00,2026-06-16 10:10,
+R005,E003,SL,2026-08-17,2026-08-17,None,1,Fever,Approved,E002,2026-08-17 07:45,2026-08-17 08:20,MC submitted
+R006,E011,HL,2026-06-22,2026-06-26,None,5,Hospital stay (minor surgery),Approved,E009,2026-06-22 08:05,2026-06-22 09:00,Discharge summary on file
+R007,E004,AL,2026-08-24,2026-08-28,None,5,Rest break,Approved,E001,2026-07-27 15:30,2026-07-28 09:15,
+R008,E013,AL,2026-01-19,2026-01-23,None,5,Travel,Approved,E001,2025-12-10 10:00,2025-12-11 11:00,
+R009,E005,AL,2026-10-26,2026-10-30,None,5,Short getaway,Pending,E004,2026-10-02 16:20,,
+R010,E006,AL,2026-10-26,2026-10-28,None,3,Moving house,Pending,E004,2026-10-03 09:40,,
+R011,E007,AL,2026-10-27,2026-10-28,None,2,Personal,Pending,E004,2026-10-04 19:05,,
+R012,E012,AL,2026-11-09,2026-11-13,None,4,Family visit,Pending,E009,2026-10-01 12:30,,
+R013,E014,AL,2026-12-21,2026-12-24,None,4,Year-end break,Approved,E013,2026-09-15 10:45,2026-09-16 09:00,
+R014,E015,AL,2026-11-02,2026-11-02,AM,0.5,Appointment,Rejected,E013,2026-10-01 08:10,2026-10-02 10:00,Insufficient operations coverage that morning
+R015,E006,OIL,2026-10-02,2026-10-02,None,1,OIL for weekend on-call,Approved,E004,2026-09-28 13:00,2026-09-28 15:20,
+R016,E011,OIL,2026-09-28,2026-09-28,None,1,OIL for weekend roadshow,Approved,E009,2026-09-22 09:30,2026-09-22 11:00,
+R017,E009,AL,2026-10-12,2026-10-13,None,2,Personal,Cancelled,E001,2026-09-25 10:00,2026-10-01 09:00,Cancelled by employee
+R018,E012,SL,2026-09-30,2026-09-30,None,1,Migraine,Approved,E009,2026-09-30 07:30,2026-09-30 08:00,MC submitted

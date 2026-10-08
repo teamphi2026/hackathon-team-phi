@@ -1,0 +1,27 @@
+date,holiday_name,day_of_week,is_in_lieu,notes,holiday_calendar_code
+2026-01-01,New Year's Day,Thursday,N,,SG
+2026-02-17,Chinese New Year (Day 1),Tuesday,N,,SG
+2026-02-18,Chinese New Year (Day 2),Wednesday,N,,SG
+2026-03-21,Hari Raya Puasa,Saturday,N,Falls on a Saturday; no day in lieu,SG
+2026-04-03,Good Friday,Friday,N,,SG
+2026-05-01,Labour Day,Friday,N,,SG
+2026-05-27,Hari Raya Haji,Wednesday,N,,SG
+2026-05-31,Vesak Day,Sunday,N,Falls on a Sunday; Monday 1 Jun is the day in lieu for staff whose rest day is Sunday,SG
+2026-06-01,Vesak Day (in lieu),Monday,Y,Applies to Mon-Fri staff,SG
+2026-08-09,National Day,Sunday,N,Falls on a Sunday; Monday 10 Aug is the day in lieu for staff whose rest day is Sunday,SG
+2026-08-10,National Day (in lieu),Monday,Y,Applies to Mon-Fri staff,SG
+2026-11-08,Deepavali,Sunday,N,Falls on a Sunday; Monday 9 Nov is the day in lieu for staff whose rest day is Sunday,SG
+2026-11-09,Deepavali (in lieu),Monday,Y,Applies to Mon-Fri staff,SG
+2026-12-25,Christmas Day,Friday,N,,SG
+2027-01-01,New Year's Day,Friday,N,,SG
+2027-02-06,Chinese New Year (Day 1),Saturday,N,Falls on a Saturday,SG
+2027-02-07,Chinese New Year (Day 2),Sunday,N,Falls on a Sunday; Monday 8 Feb is the day in lieu for staff whose rest day is Sunday,SG
+2027-02-08,Chinese New Year (in lieu),Monday,Y,Applies to Mon-Fri staff,SG
+2027-03-10,Hari Raya Puasa,Wednesday,N,,SG
+2027-03-26,Good Friday,Friday,N,,SG
+2027-05-01,Labour Day,Saturday,N,Falls on a Saturday,SG
+2027-05-17,Hari Raya Haji,Monday,N,,SG
+2027-05-20,Vesak Day,Thursday,N,,SG
+2027-08-09,National Day,Monday,N,,SG
+2027-10-28,Deepavali,Thursday,N,,SG
+2027-12-25,Christmas Day,Saturday,N,Falls on a Saturday,SG

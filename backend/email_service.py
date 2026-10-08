@@ -104,13 +104,13 @@ def _send(to_addr: str, subject: str, html: str, *, kind: str = "email",
                   level=logging.WARNING)
         get_session().log_activity(
             "conflict",
-            f"[DRY-RUN email — NOT sent: SMTP_USER/SMTP_PASSWORD/EMAIL_FROM not set in .env] "
-            f"to={to_addr} subject={subject!r}",
+            f"Didn't email {to_addr or 'the recipient'} (\"{subject}\"): email sending isn't set up yet "
+            f"(SMTP details missing in .env)",
         )
         return {"sent": False, "dry_run": True, "to": to_addr, "subject": subject, "html": html}
     if not to_addr:
         log_email("skipped", {**ctx, "reason": "no recipient address on file"}, level=logging.ERROR)
-        get_session().log_activity("conflict", f"Email not sent: no recipient address ({subject!r})")
+        get_session().log_activity("conflict", f"Didn't send \"{subject}\": there's no email address on file for the recipient")
         return {"sent": False, "dry_run": False, "error": "No recipient address.", "to": to_addr}
 
     msg = MIMEMultipart("alternative")
@@ -131,7 +131,7 @@ def _send(to_addr: str, subject: str, html: str, *, kind: str = "email",
             stage = "send"
             server.sendmail(config.EMAIL_FROM, [to_addr], msg.as_string())
         log_email("sent", {**ctx, "duration_ms": round((time.perf_counter() - started) * 1000, 1)})
-        get_session().log_activity("ok", f"Email sent to {to_addr} — {subject}")
+        get_session().log_activity("ok", f"Emailed {to_addr}: \"{subject}\"")
         return {"sent": True, "dry_run": False, "to": to_addr, "subject": subject}
     except Exception as exc:  # pragma: no cover - network failure path
         code = getattr(exc, "smtp_code", None)
@@ -144,7 +144,9 @@ def _send(to_addr: str, subject: str, html: str, *, kind: str = "email",
             "hint": _failure_hint(code, text or str(exc), stage, name),
             "duration_ms": round((time.perf_counter() - started) * 1000, 1),
         }, level=logging.ERROR)
-        get_session().log_activity("conflict", f"Email send failed at {stage}: {exc}")
+        hint = _failure_hint(code, text or str(exc), stage, name)
+        get_session().log_activity(
+            "conflict", f"Couldn't email {to_addr} ({stage} step failed): {hint or str(exc)[:120]}")
         return {"sent": False, "dry_run": False, "error": str(exc), "stage": stage, "to": to_addr}
 
 

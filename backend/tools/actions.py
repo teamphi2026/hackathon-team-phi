@@ -133,7 +133,7 @@ def submit_leave_request(
     session.employee_time_id = new_id
     session.approval_status = "PENDING_MANAGER_APPROVAL"
     session.reference_id = new_id
-    session.log_activity("ok", f"Request {new_id} submitted — pending manager approval")
+    session.log_activity("ok", f"Saved request {new_id}; it's now waiting for your manager's approval")
 
     return {
         "success": True,
@@ -191,7 +191,7 @@ def handle_approval_token(token: str, action: str | None = None) -> dict[str, An
         _write_rows(EMPLOYEE_TIME, header, rows)
         _write_debit_row(target)
         session.approval_status = "SUBMITTED"
-        session.log_activity("ok", f"{employee_time_id} approved — ledger updated")
+        session.log_activity("ok", f"Request {employee_time_id} approved and the leave balance updated")
         return {"success": True, "action": "approve", "employee_time_id": employee_time_id,
                 "message": f"Request {employee_time_id} approved."}
     else:
@@ -200,7 +200,7 @@ def handle_approval_token(token: str, action: str | None = None) -> dict[str, An
         target["decision_note"] = "Rejected by manager"
         _write_rows(EMPLOYEE_TIME, header, rows)
         session.approval_status = "REJECTED"
-        session.log_activity("conflict", f"{employee_time_id} rejected by manager")
+        session.log_activity("conflict", f"Request {employee_time_id} was rejected, so no leave was deducted")
         return {"success": True, "action": "reject", "employee_time_id": employee_time_id,
                 "message": f"Request {employee_time_id} rejected."}
 
@@ -315,7 +315,7 @@ def handle_ui_decision(employee_time_id: str, action: str,
         _write_rows(EMPLOYEE_TIME, header, rows)
         _write_debit_row(target)
         session.approval_status = "SUBMITTED"
-        session.log_activity("ok", f"{employee_time_id} approved (UI) — ledger updated")
+        session.log_activity("ok", f"Request {employee_time_id} approved and the leave balance updated")
         return {"success": True, "action": "approve", "employee_time_id": employee_time_id,
                 "message": f"Request {employee_time_id} approved."}
     target["approval_status"] = "Rejected"
@@ -323,7 +323,7 @@ def handle_ui_decision(employee_time_id: str, action: str,
     target["decision_note"] = "Rejected by manager"
     _write_rows(EMPLOYEE_TIME, header, rows)
     session.approval_status = "REJECTED"
-    session.log_activity("conflict", f"{employee_time_id} rejected (UI)")
+    session.log_activity("conflict", f"Request {employee_time_id} was rejected, so no leave was deducted")
     return {"success": True, "action": "reject", "employee_time_id": employee_time_id,
             "message": f"Request {employee_time_id} rejected."}
 

@@ -21,7 +21,7 @@ import re
 from datetime import date, datetime, timedelta
 from typing import Any, Callable
 
-from . import config, filters, suggestions
+from . import activity_text, config, filters, suggestions
 from .state import SessionState, get_session
 from .tool_logger import call_tool, log_intent, log_llm_call
 from .tools import actions, hr, policy_rag
@@ -163,12 +163,25 @@ def parse_dates(message: str) -> list[str]:
     return out
 
 
+def _log_step(name: str, args: dict[str, Any], result: Any, fallback: str | None = None) -> None:
+    """Add one plain-English line to the Agent Activity panel for a finished tool call."""
+    line = activity_text.describe(name, args, result)
+    if line is None:
+        return
+    get_session().log_activity(line[0], line[1] if line[1] else (fallback or name))
+
+
 def _run_tool(name: str, label: str, status: str = "working", **kwargs) -> Any:
-    """Invoke a tool, logging it to the activity stream and the debug log."""
+    """Invoke a tool, logging it to the activity stream and the debug log.
+
+    `label`/`status` are kept for call-site compatibility; the activity line is
+    now generated from the tool's result (see activity_text.describe).
+    """
     session = get_session()
-    session.log_activity(status, label)
     session.turn_tools.append(name)
-    return call_tool(name, TOOLS[name], **kwargs)
+    result = call_tool(name, TOOLS[name], **kwargs)
+    _log_step(name, kwargs, result, fallback=label)
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -425,9 +438,9 @@ def _route_llm(message: str, session: SessionState) -> str:  # pragma: no cover 
             # employee confirmation is a precondition enforced server-side.
             if name == "submit_leave_request" and not session.employee_confirmed:
                 session.employee_confirmed = True
-            session.log_activity("working", f"{name}({', '.join(args)})")
             session.turn_tools.append(name)
             result = call_tool(name, TOOLS[name], **args) if name in TOOLS else {"error": "unknown tool"}
+            _log_step(name, args, result)
             if name == "validate_policy" and isinstance(result, dict) and result.get("valid"):
                 session.last_assessed = {
                     "leave_type": args.get("leave_type"), "start_date": args.get("start_date"),
@@ -538,7 +551,6 @@ def _balance_reply(session: SessionState) -> str:
                      a["account_type"], a["account_type"])
         note = f" ({a['note']})" if a.get("note") else ""
         lines.append(f"- {label}: {a['available']} day(s) available{note}")
-    session.log_activity("ok", "Entitlements loaded")
     return "Here's your current leave balance:\n" + "\n".join(lines)
 
 
@@ -548,7 +560,6 @@ def _policy_reply(message: str) -> str:
     if not citations:
         return result.get("answer", "I couldn't find that in the policy.")
     top = citations[0]
-    get_session().log_activity("ok", f"Policy match — {top['section']}")
     return result["answer"]
 
 
@@ -598,15 +609,11 @@ def _leave_request_reply(message: str, session: SessionState) -> str:
     conflicts = []
     if worst == "SHORT":
         short_team = next(t for t in coverage["teams"] if t["status"] == "SHORT")
-        session.log_activity("fail", f"Coverage SHORT — {short_team['team_name']} "
-                                     f"{short_team['on_duty']}/{short_team['headcount']}")
         conflicts.append(
             f"your team **{short_team['team_name']}** would drop to "
             f"{short_team['on_duty']} on duty (minimum {short_team['min_required']})"
         )
     if events["events"]:
-        for e in events["events"]:
-            session.log_activity("fail", f"Project event — {e['description']}")
         conflicts.append("a project **" + events["events"][0]["event_type"].replace("_", " ").lower()
                          + "** (" + events["events"][0]["description"] + ")")
 
@@ -625,7 +632,6 @@ def _leave_request_reply(message: str, session: SessionState) -> str:
         )
 
     # Conflicts -> search alternatives.
-    session.log_activity("working", "Searching viable alternative dates...")
     alts = _run_tool("find_viable_date_ranges", "Finding viable date ranges", status="ok",
                      leave_type=leave_type, duration_days=duration,
                      preferred_start=start, search_days=28)
@@ -643,7 +649,8 @@ def _leave_request_reply(message: str, session: SessionState) -> str:
     session.recommended_leave_type = leave_type
     session.recommended_dates = (best["start_date"], best["end_date"])
     session.recommendation_reason = best["reason"]
-    session.log_activity("rec", f"Recommended: {best['start_date']}→{best['end_date']} ({leave_type})")
+    session.log_activity("rec", f"Recommending {hr.format_date_range(date.fromisoformat(best['start_date']), date.fromisoformat(best['end_date']))} "
+                                f"({activity_text._leave(leave_type)}) as the best alternative")
     session.last_assessed = {
         "leave_type": leave_type, "start_date": best["start_date"], "end_date": best["end_date"],
         "date_label": hr.format_date_range(date.fromisoformat(best["start_date"]),
@@ -672,7 +679,7 @@ def _leave_request_reply(message: str, session: SessionState) -> str:
 
 def _confirm_and_submit(session: SessionState) -> str:
     session.employee_confirmed = True
-    session.log_activity("ok", "Employee confirmed — EMPLOYEE_CONFIRMED")
+    session.log_activity("ok", "You confirmed the request, so I'm submitting it now")
     start, end = session.recommended_dates
     leave_type = session.recommended_leave_type or session.requested_leave_type or "AL"
     result = actions.submit_leave_request(leave_type, start, end, "None",
@@ -699,8 +706,8 @@ def _confirm_and_submit(session: SessionState) -> str:
 
 
 def _status_lookup(reference_id: str) -> str:
-    get_session().log_activity("working", f"Looking up {reference_id}")
     result = actions.get_request_status(reference_id)
+    _log_step("get_request_status", {"reference_id": reference_id}, result)
     if not result.get("found"):
         return result["message"]
     r = result["requests"][0]

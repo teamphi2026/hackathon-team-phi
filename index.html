@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script src="config.js"></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Leave Agent — Team Phi</title>
@@ -970,7 +971,10 @@
     // Backend API URL. Defaults to the local FastAPI server on port 8000.
     // Override by setting window.LEAVE_API_BASE before this script runs
     // (e.g. for a deployed backend). Leave as '' to use the same origin.
-    const DEFAULT_API_BASE = 'http://localhost:8000';
+    // On localhost, talk to the local FastAPI server. When deployed, use the backend URL
+    // from config.js (empty = same origin).
+    const IS_LOCAL = ['localhost', '127.0.0.1', ''].includes(window.location.hostname);
+    const DEFAULT_API_BASE = IS_LOCAL ? 'http://localhost:8000' : '';
     const API_BASE = (window.LEAVE_API_BASE || DEFAULT_API_BASE).replace(/\/$/, '');
     const api = (path) => `${API_BASE}${path}`;
 

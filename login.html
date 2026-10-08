@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script src="config.js"></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Sign in · Leave Planning Agent</title>
@@ -102,10 +103,19 @@
   </div>
 
   <script>
-    const DEFAULT_API_BASE = 'http://localhost:8000';
+    // On localhost, talk to the local FastAPI server. When deployed, use the backend URL
+    // from config.js (empty = same origin).
+    const IS_LOCAL = ['localhost', '127.0.0.1', ''].includes(window.location.hostname);
+    const DEFAULT_API_BASE = IS_LOCAL ? 'http://localhost:8000' : '';
     const API_BASE = (window.LEAVE_API_BASE || DEFAULT_API_BASE).replace(/\/$/, '');
     const api = (p) => `${API_BASE}${p}`;
 
+    // Clear message when the backend can't be reached (most often: LEAVE_API_BASE unset in production).
+    function backendHelp() {
+      return IS_LOCAL
+        ? 'Could not reach the backend. Is it running on ' + API_BASE + '?'
+        : 'Could not reach the backend API. Set LEAVE_API_BASE in config.js to the deployed backend URL.';
+    }
     // Already logged in? Go straight to the app.
     if (localStorage.getItem('leave_token')) window.location.href = 'index.html';
 
@@ -136,7 +146,7 @@
         localStorage.setItem('leave_token', data.token);
         window.location.href = 'index.html';
       } catch (err) {
-        show('l-msg', 'Could not reach the backend. Is it running on ' + API_BASE + '?', 'error');
+        show('l-msg', backendHelp(), 'error');
       }
       return false;
     }
@@ -157,7 +167,7 @@
         show('r-msg', 'Account created for ' + data.display_name + '. You can sign in now.', 'ok');
         setTimeout(() => { switchTab('login'); document.getElementById('l-user').value = username; }, 900);
       } catch (err) {
-        show('r-msg', 'Could not reach the backend. Is it running on ' + API_BASE + '?', 'error');
+        show('r-msg', backendHelp(), 'error');
       }
       return false;
     }

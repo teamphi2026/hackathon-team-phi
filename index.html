@@ -1404,7 +1404,8 @@
             ? 'The employee has been notified by email.'
             : 'The employee could not be notified by email.';
           if (action === 'approve') {
-            appendAgentMessage(`You <strong>approved</strong> ${ref}. ${mail}`);
+            const sheet = data.forecast_status === 'updated' ? ' The leave forecast sheet was updated.' : '';
+            appendAgentMessage(`You <strong>approved</strong> ${ref}. ${mail}${sheet}`);
           } else {
             appendAgentMessage(`You <strong>rejected</strong> ${ref}. No leave balance was deducted. ${mail}`);
           }

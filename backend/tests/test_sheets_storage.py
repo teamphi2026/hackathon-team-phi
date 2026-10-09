@@ -331,3 +331,54 @@ def test_startup_rejects_missing_remote_tables(sheets):
     with pytest.raises(storage.StorageError, match="Missing worksheet"):
         with TestClient(app):
             pass
+
+
+@pytest.mark.parametrize('decision,broken', [('approve', False), ('approve', True), ('reject', False)])
+def test_forecast_and_persistent_ui_decision(sheets, monkeypatch, tmp_path, decision, broken):
+    from backend import main, leave_forecast
+    fake, store, session = sheets
+    eid = submit(session)
+    _, people = actions._read_rows('02_Job_Information.csv')
+    name = next(p['full_name'] for p in people if p['user_id'] == 'E005')
+    path = tmp_path / 'forecast.csv'
+    with path.open('w', newline='') as handle:
+        csv.writer(handle).writerows([['Named Resource', 'Nov-26'], [name, '']])
+    monkeypatch.setattr(config, 'LEAVE_FORECAST_CSV', str(path))
+    if broken:
+        monkeypatch.setattr(leave_forecast.CsvBackend, 'write_cell', lambda *args: (_ for _ in ()).throw(OSError('unavailable')))
+    monkeypatch.setattr(main, '_require_identity', lambda token: 'E004')
+    sent = []
+    def notify(request_id, **kwargs):
+        assert actions.get_request_status(request_id)['requests'][0]['status'] == ('Approved' if decision == 'approve' else 'Rejected')
+        sent.append(request_id)
+        return {'sent': True}
+    monkeypatch.setattr(email_service, 'send_confirmation_email', notify)
+    monkeypatch.setattr(email_service, 'send_rejection_email', notify)
+    result = main.ui_approval(main.UIApproval(employee_time_id=eid, action=decision))
+    assert result['success'] and result['employee_emailed']
+    assert sent == [eid]
+    if decision == 'approve':
+        assert result['forecast_status'] == ('failed' if broken else 'updated')
+        if not broken:
+            assert '17-18 (CL)' in path.read_text()
+            assert leave_forecast.record_approved_leave(eid)['status'] == 'unchanged'
+    else:
+        assert 'forecast_status' not in result
+        assert '(CL)' not in path.read_text()
+    assert not main.ui_approval(main.UIApproval(employee_time_id=eid, action=decision))['success']
+    assert sent == [eid]
+
+
+def test_forecast_uses_shared_google_credentials(monkeypatch):
+    import gspread
+    from types import SimpleNamespace
+    from backend import google_sheets, leave_forecast
+    credentials = object()
+    sheet = SimpleNamespace(title='Forecast')
+    book = SimpleNamespace(title='Leave', worksheet=lambda name: sheet)
+    monkeypatch.setattr(google_sheets, 'load_credentials', lambda: credentials)
+    def authorize(actual):
+        assert actual is credentials
+        return SimpleNamespace(open_by_key=lambda key: book)
+    monkeypatch.setattr(gspread, 'authorize', authorize)
+    assert leave_forecast.GoogleSheetBackend('workbook', 'Forecast').ws is sheet

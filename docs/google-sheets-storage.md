@@ -101,3 +101,17 @@ workbook. A passing unit test is not verification of your credentials or tabs.
 API references: [batch updates](https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets/batchUpdate),
 [batch reads](https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets.values/batchGet),
 [quotas](https://developers.google.com/workspace/sheets/api/limits).
+
+## Optional approval forecast
+
+The monthly forecast is a separate display updated after an approval commits.
+Set `GOOGLE_SHEET_ID` to its workbook ID and `GOOGLE_SHEET_TAB` to its tab name.
+Both features share `GOOGLE_APPLICATION_CREDENTIALS` (or the JSON/legacy
+`GOOGLE_SERVICE_ACCOUNT_FILE` alternatives). The forecast can use the same
+workbook as persistence, but must use a separate tab with its monthly layout.
+Leave `GOOGLE_SHEET_ID` empty to disable forecast updates. `LEAVE_FORECAST_CSV`
+is an optional local-development override.
+
+Forecast failures are reported in activity logs and do not undo an approval or
+prevent the notification email. The request and ledger tables remain authoritative;
+the forecast is not part of their atomic transaction.

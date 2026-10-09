@@ -20,7 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
 from pydantic import BaseModel
 
-from . import agent, auth, email_service, suggestions, storage, config
+from . import agent, auth, email_service, leave_forecast, suggestions, storage, config
 from .state import get_session
 from .tools import actions
 from .tools import team_project as tp
@@ -148,6 +148,9 @@ def _notify_employee(result: dict) -> dict:
     if result.get("success"):
         eid = result["employee_time_id"]
         if result["action"] == "approve":
+            # Record the approved leave in the forecast sheet (best-effort; never blocks approval).
+            sheet = leave_forecast.record_approved_leave(eid)
+            result["forecast_status"] = sheet["status"]
             mail = email_service.send_confirmation_email(eid)
         else:
             mail = email_service.send_rejection_email(eid, reason="Rejected by manager")

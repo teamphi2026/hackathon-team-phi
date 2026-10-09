@@ -23,6 +23,8 @@ def _deterministic_mode(monkeypatch):
     re-enable credentials explicitly within their own test bodies.
     """
     monkeypatch.setattr(config, "DATA_BACKEND", "csv")
+    monkeypatch.setattr(config, "GOOGLE_SHEET_ID", "")
+    monkeypatch.setattr(config, "LEAVE_FORECAST_CSV", "")
     monkeypatch.setattr(config, "ICA_API_KEY", "")
     monkeypatch.setattr(config, "ICA_BASE_URL", "")
 
@@ -32,6 +34,7 @@ def _isolate_email_log(monkeypatch, tmp_path):
     """Keep test runs out of the real logs/email_events.jsonl."""
     from backend import tool_logger
     monkeypatch.setattr(tool_logger, "EMAIL_LOG_FILE", tmp_path / "email_events.jsonl")
+    monkeypatch.setattr(tool_logger, "FORECAST_LOG_FILE", tmp_path / "leave_forecast.jsonl")
 
 
 @pytest.fixture

@@ -63,6 +63,23 @@ def _cell(value: str, column: str) -> dict:
     return {"userEnteredValue": {"stringValue": str(value)}}
 
 
+def load_credentials():
+    """Shared authentication for persistent tables and the optional forecast."""
+    try:
+        import google.auth
+        from google.oauth2.service_account import Credentials
+        raw = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "").strip()
+        legacy_file = os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE", "").strip()
+        if raw:
+            return Credentials.from_service_account_info(json.loads(raw), scopes=SCOPES)
+        if legacy_file:
+            return Credentials.from_service_account_file(legacy_file, scopes=SCOPES)
+        credentials, _ = google.auth.default(scopes=SCOPES)
+        return credentials
+    except Exception:
+        raise StorageError("Google credentials unavailable. Set GOOGLE_APPLICATION_CREDENTIALS, GOOGLE_SERVICE_ACCOUNT_FILE or GOOGLE_SERVICE_ACCOUNT_JSON on the server.") from None
+
+
 class SheetsStore:
     def __init__(self, spreadsheet_id: str, session, tab_map: dict | None = None):
         if not re.fullmatch(r"[A-Za-z0-9_-]+", spreadsheet_id):
@@ -74,17 +91,8 @@ class SheetsStore:
 
     @classmethod
     def from_config(cls):
-        try:
-            import google.auth
-            from google.auth.transport.requests import AuthorizedSession
-            from google.oauth2.service_account import Credentials
-            raw = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "").strip()
-            if raw:
-                credentials = Credentials.from_service_account_info(json.loads(raw), scopes=SCOPES)
-            else:
-                credentials, _ = google.auth.default(scopes=SCOPES)
-        except Exception:
-            raise StorageError("Google credentials unavailable. Install google-auth and set GOOGLE_APPLICATION_CREDENTIALS or GOOGLE_SERVICE_ACCOUNT_JSON on the server.") from None
+        from google.auth.transport.requests import AuthorizedSession
+        credentials = load_credentials()
         try:
             mapping = json.loads(config.GOOGLE_SHEETS_TAB_MAP)
             if not isinstance(mapping, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in mapping.items()):

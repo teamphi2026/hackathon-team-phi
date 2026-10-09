@@ -31,6 +31,7 @@ def _isolate_email_log(monkeypatch, tmp_path):
     """Keep test runs out of the real logs/email_events.jsonl."""
     from backend import tool_logger
     monkeypatch.setattr(tool_logger, "EMAIL_LOG_FILE", tmp_path / "email_events.jsonl")
+    monkeypatch.setattr(tool_logger, "FORECAST_LOG_FILE", tmp_path / "leave_forecast.jsonl")
 
 
 @pytest.fixture

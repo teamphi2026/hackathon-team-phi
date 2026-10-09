@@ -36,3 +36,10 @@ services:
       # e.g. https://leave-agent-api.onrender.com
       - key: APP_BASE_URL
         sync: false
+      # Leave forecast Google Sheet (see backend/leave_forecast.py).
+      - key: GOOGLE_SHEET_ID
+        sync: false
+      - key: GOOGLE_SHEET_TAB
+        sync: false
+      - key: GOOGLE_SERVICE_ACCOUNT_JSON
+        sync: false

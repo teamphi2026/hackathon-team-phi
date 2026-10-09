@@ -25,6 +25,7 @@ from .state import get_session
 LOG_DIR = REPO_ROOT / "logs"
 LOG_FILE = LOG_DIR / "tool_calls.jsonl"
 EMAIL_LOG_FILE = LOG_DIR / "email_events.jsonl"
+FORECAST_LOG_FILE = LOG_DIR / "leave_forecast.jsonl"
 
 _MAX_FIELD = 800  # chars; truncate long arg/result previews
 _REDACT_KEYS = {"token", "password", "api_key", "smtp_password"}
@@ -84,6 +85,29 @@ def log_email(event: str, detail: dict[str, Any], *, level: int = logging.INFO) 
     }
     email_logger.log(level, "✉ email.%s %s", event, _safe(_redact_args(detail)))
     _write_record(record, EMAIL_LOG_FILE)
+
+
+forecast_logger = logging.getLogger("leave.forecast")
+if not forecast_logger.handlers:
+    _fh = logging.StreamHandler()
+    _fh.setFormatter(logging.Formatter("%(asctime)s [%(name)s] %(message)s"))
+    forecast_logger.addHandler(_fh)
+    forecast_logger.setLevel(logging.INFO)
+
+
+def log_forecast(event: str, detail: dict[str, Any], *, level: int = logging.INFO) -> None:
+    """Log a leave-forecast sheet event to stderr and logs/leave_forecast.jsonl.
+
+    `event` is one of: updated, unchanged, skipped, failed. Never log credentials.
+    """
+    record = {
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "user": get_session().session_user_id,
+        "forecast_event": event,
+        **_redact_args(detail),
+    }
+    forecast_logger.log(level, "▦ forecast.%s %s", event, _safe(_redact_args(detail)))
+    _write_record(record, FORECAST_LOG_FILE)
 
 
 def log_intent(kind: str, detail: dict[str, Any]) -> None:

@@ -223,3 +223,34 @@ def test_llm_error_is_logged_and_handled(tmp_path, monkeypatch):
     records = _read_records(tmp_path)
     errored = [r for r in records if r.get("llm_call") and r.get("error")]
     assert errored and "endpoint down" in errored[0]["error"]
+
+
+def test_llm_team_availability_receives_named_scoped_results(monkeypatch):
+    """Exercise schema, dispatch, tool response and output filtering together."""
+    class TeamCompletions:
+        calls = 0
+
+        def create(self, **kwargs):
+            self.calls += 1
+            if self.calls == 1:
+                assert any(t["function"]["name"] == "get_team_leave" for t in kwargs["tools"])
+                return _Resp(_Msg(tool_calls=[_ToolCall(
+                    "get_team_leave", '{"start_date":"2026-10-27","end_date":"2026-10-28"}'
+                )]), "tool_calls")
+            result = json.loads(kwargs["messages"][-1]["content"])
+            entries = [e for t in result["teams"] for e in t["out_of_office"]]
+            rahul = next(e for e in entries if e["name"] == "Rahul Menon")
+            assert rahul["status"] == "Pending"
+            assert "reason" not in rahul and "user_id" not in rahul
+            return _Resp(_Msg(content=f"{rahul['name']}: {rahul['start_date']} to "
+                             f"{rahul['end_date']} ({rahul['status']})."), "stop")
+
+    monkeypatch.setattr(config, "ICA_API_KEY", "test-key")
+    monkeypatch.setattr(config, "ICA_BASE_URL", "https://example.test")
+    import openai
+    client = types.SimpleNamespace(chat=types.SimpleNamespace(completions=TeamCompletions()))
+    monkeypatch.setattr(openai, "OpenAI", lambda **kwargs: client)
+    out = agent.handle_message("Who on my team is off 27 to 28 Oct?")
+    assert "Rahul Menon" in out["reply"] and "Pending" in out["reply"]
+    assert get_session().turn_tools == ["get_team_leave"]
+    assert get_session().reference_id is None

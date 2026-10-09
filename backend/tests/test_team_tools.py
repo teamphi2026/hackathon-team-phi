@@ -67,11 +67,12 @@ def test_find_viable_avoids_27_28_oct():
             assert team["status"] != "SHORT"
 
 
-def test_get_team_leave_anonymised():
+def test_get_team_leave_names_without_private_details():
     tl = tp.get_team_leave("2026-10-27", "2026-10-28")
     t02 = next(t for t in tl["teams"] if t["team_id"] == "T02")
     assert len(t02["out_of_office"]) >= 1
-    # Output is anonymised — no employee ids or names leak.
+    assert {e["name"] for e in t02["out_of_office"]} >= {"Rahul Menon", "Sarah Koh"}
+    # Availability is named; private HR details remain excluded.
     for entry in t02["out_of_office"]:
         assert entry["label"] == "Out of office"
-        assert "user_id" not in entry
+        assert not {"user_id", "email", "reason", "decision_note", "time_type_code"} & entry.keys()

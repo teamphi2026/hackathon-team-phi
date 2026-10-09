@@ -72,8 +72,8 @@ def test_g7_tools_ignore_injected_user_id(isolate_data):
     assert hr.get_employee_profile()["user_id"] == "E005"
 
 
-# Guardrail 8: other users' free text never surfaces (anonymised team data).
-def test_g8_team_leave_is_anonymised(isolate_data):
+# Guardrail 8: other users' free text never surfaces (private details omitted).
+def test_g8_team_leave_excludes_private_details(isolate_data):
     from backend.tools import team_project as tp
     tl = tp.get_team_leave("2026-10-27", "2026-10-28")
     for team in tl["teams"]:

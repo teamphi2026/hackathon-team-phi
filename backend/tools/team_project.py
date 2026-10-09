@@ -7,8 +7,9 @@ Implements:
   - find_viable_date_ranges(leave_type, duration_days, preferred_start, search_days)
 
 All logic is deterministic. Session user_id comes from backend.state, never
-from the LLM. Other employees' identities are anonymised to "Out of office"
-in the tool output itself (not only in the UI).
+from the LLM. Chat team leave exposes names and absence dates only for the
+session user's teams. Private leave types, reasons, employee ids and contact
+details are omitted from the chat tool.
 """
 from __future__ import annotations
 
@@ -73,7 +74,7 @@ def _absences_in_range(start: date, end: date) -> pd.DataFrame:
 
 def get_team_leave(start_date: str | date, start_end: str | date | None = None,
                    end_date: str | date | None = None) -> dict[str, Any]:
-    """Anonymised 'Out of office' list per team the session user belongs to.
+    """Named availability list per team the session user belongs to.
 
     Signature accepts (start_date, end_date); the middle positional is tolerated
     for callers that pass dates positionally.
@@ -84,6 +85,7 @@ def get_team_leave(start_date: str | date, start_end: str | date | None = None,
     teams = _user_team_ids(uid)
     absences = _absences_in_range(start, end)
 
+    names = _employee_names()
     result: list[dict[str, Any]] = []
     for team_id in teams:
         members = set(_team_members(team_id))
@@ -92,7 +94,10 @@ def get_team_leave(start_date: str | date, start_end: str | date | None = None,
         for _, r in out_rows.iterrows():
             entries.append(
                 {
-                    "label": "Out of office",  # anonymised in the tool output
+                    "label": "Out of office",
+                    "name": names.get(r["user_id"], "Team member"),
+                    "is_self": r["user_id"] == uid,
+                    "half_day": r["half_day"],
                     "start_date": r["start_date"],
                     "end_date": r["end_date"],
                     "status": r["approval_status"],
@@ -320,9 +325,8 @@ def get_team_calendar(year: int, month: int) -> dict[str, Any]:
       - named leave entries overlapping the month (who, type, dates, status)
       - per-day coverage status (OK / AT_MIN / SHORT) for colouring
 
-    Names ARE included here (unlike the anonymised chat tools): this is a
-    first-party team calendar view, not an LLM response subject to the output
-    filter. Only the user's own teams are exposed.
+    Like the chat availability tool, only the user's own teams are exposed.
+    This first-party calendar additionally includes leave types and employee ids.
     """
     uid = _current_user_id()
     start, end = _month_bounds(year, month)

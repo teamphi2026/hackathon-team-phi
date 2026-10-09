@@ -277,8 +277,31 @@ def _system_prompt() -> str:
         "leave type is unavailable based on your own assumptions; if the user "
         "asks for Annual Leave, it exists and is bookable unless validate_policy "
         "says otherwise.\n\n"
+        "LEAVE QUANTITY FORMAT (mandatory): Whenever a reply reports leave-day "
+        "counts — balances, days remaining, entitlements, days used, pending days, "
+        "requested working days, or projected balances after a request — present "
+        "those quantities in a Markdown table, even for a single leave type or "
+        "a single number. Do not present leave-day counts only in prose or bullets. "
+        "Use full leave-type names and put the unit '(days)' in numeric column "
+        "headers. For balance questions such as 'How many days of leave do I have "
+        "left?', call get_entitlements and use this table structure:\n"
+        "| Leave type | Available (days) | Notes |\n"
+        "| --- | ---: | --- |\n"
+        "Populate one row per relevant returned leave type; show all returned "
+        "types for a general balance question, including zero balances. Preserve "
+        "fractional days and include eligibility or balance caveats in Notes. "
+        "For other quantity questions, use the same table style with clearly "
+        "labelled columns such as Entitlement (days), Used (days), Pending (days), "
+        "Requested (days), or Remaining after request (days), only when supported "
+        "by tool results. Keep current available balances distinct from projected "
+        "balances; never invent missing values or treat them as zero. Policy "
+        "entitlement counts must come from search_policy and retain their source "
+        "citation and conditions. A brief introduction, explanation, or confirmation "
+        "question may surround the table. This table requirement also applies to "
+        "leave recommendations and submission confirmations.\n\n"
         "HOW TO HELP (be smooth and low-friction):\n"
-        "1. If the user names dates, call validate_policy, check_coverage, and "
+        "1. If the user wants to plan their own leave and names dates, call "
+        "validate_policy, check_coverage, and "
         "get_project_events for exactly those dates. Do not ask for information "
         "you can look up yourself (profile, manager, balances, which types "
         "exist). Default to Annual Leave (AL) when the user says 'leave' or "
@@ -309,6 +332,14 @@ def _system_prompt() -> str:
         "the reference id if given, otherwise omit it. Report status, dates (use "
         "date_label) and, if Pending, who it is awaiting. Never say you lack a tool "
         "for this.\n\n"
+        "TEAM AVAILABILITY: For questions such as 'Who on my team is off next week?', "
+        "call get_team_leave for the requested date range. Use the calendar above "
+        "to resolve next week from Monday through Sunday. Report colleagues' names, "
+        "absence dates, half-days and approval status from the result; distinguish "
+        "Pending requests from approved leave and identify is_self entries as the "
+        "user's own leave. If there are no entries, say no leave is recorded for "
+        "that range. This is a read-only lookup, not a request to book leave; do not "
+        "validate or submit a personal request.\n\n"
         "SUBMITTING: Call submit_leave_request ONLY after the user clearly agrees "
         "to a specific type + date range (e.g. 'yes', 'confirm', 'go ahead', "
         "'book it'). After submitting, tell them the reference id, and say their "
@@ -316,8 +347,9 @@ def _system_prompt() -> str:
         "otherwise follow its email_note. Never call submit_leave_request just to assess "
         "dates.\n\n"
         "RULES: Never invent balances, dates, working-day counts, or approvals — "
-        "always use the tools. Never reveal other employees' names, ids, emails, "
-        "or leave reasons; refer to colleagues' leave only as 'out of office'. "
+        "always use the tools. You may share teammate names and availability returned "
+        "by get_team_leave. Never reveal other employees' ids, emails, leave types "
+        "or leave reasons; describe their absence as 'out of office'. "
         "Keep replies concise and friendly."
     )
 
@@ -342,6 +374,12 @@ def _tool_schema() -> list[dict[str, Any]]:
          "parameters": {"type": "object", "properties": {
              "leave_type": {"type": "string"}, "start_date": date, "end_date": date,
              "half_day": {"type": "string"}}, "required": ["leave_type", "start_date", "end_date"]}}},
+        {"type": "function", "function": {"name": "get_team_leave",
+         "description": "Look up who on the signed-in employee's teams is out of office "
+                        "in a date range. Returns names, dates, half-days, status and is_self; "
+                        "Pending requests are not confirmed absences.",
+         "parameters": {"type": "object", "properties": {"start_date": date, "end_date": date},
+                        "required": ["start_date", "end_date"]}}},
         {"type": "function", "function": {"name": "check_coverage",
          "description": "Team coverage over a date range.",
          "parameters": {"type": "object", "properties": {"start_date": date, "end_date": date},
@@ -503,6 +541,16 @@ def _route(message: str, session: SessionState) -> str:
         log_intent("planner_intent", {"intent": "status_lookup", "reference_id": m.group(1).upper()})
         return _status_lookup(m.group(1).upper())
 
+    # Read-only team availability must precede personal leave planning.
+    asks_who = re.search(r"\bwho(?:'s| is| are| on)\b", text)
+    asks_team = (re.search(r"\b(team|teammates|colleagues)\b", text)
+                 and re.match(r"(?:show|list|check|any|is|are|what|which)\b", text))
+    if ((asks_who or asks_team)
+            and re.search(r"\b(off|away|absent|leave|availability)\b", text)
+            and not re.search(r"\b(approve|approves|approval|policy)\b", text)):
+        log_intent("planner_intent", {"intent": "team_availability"})
+        return _team_leave_reply(message)
+
     # 3) Policy question (grounded in the company policy document).
     if any(w in text for w in ("policy", "entitled to", "how many days do i get",
                                "how much", "rules on", "allowed", "carry over",
@@ -539,6 +587,36 @@ def _route(message: str, session: SessionState) -> str:
         "I can help you check your leave balance, plan time off around your team "
         "and project schedule, or check the status of a request. What would you like to do?"
     )
+
+
+def _team_leave_reply(message: str) -> str:
+    dates = parse_dates(message)
+    if dates:
+        start, end = dates[0], dates[-1]
+    elif "next week" in message.lower():
+        today = date.today()
+        monday = today + timedelta(days=7 - today.weekday())
+        start, end = monday.isoformat(), (monday + timedelta(days=6)).isoformat()
+    else:
+        return "Which dates should I check for your team's time off?"
+    result = _run_tool("get_team_leave", "Checking team availability",
+                       start_date=start, end_date=end)
+    if not result["teams"]:
+        return "You're not assigned to a team in the leave system."
+    lines = []
+    for team in result["teams"]:
+        for entry in team["out_of_office"]:
+            name = "You" if entry["is_self"] else entry["name"]
+            half_day = entry.get("half_day")
+            partial = f" ({half_day} half-day)" if half_day in ("AM", "PM") else ""
+            line = (f"- {name}: out of office {entry['start_date']} to "
+                    f"{entry['end_date']}{partial} — {entry['status']}")
+            if line not in lines:
+                lines.append(line)
+    if not lines:
+        return f"No team leave is recorded for {start} to {end}."
+    return (f"Team leave overlapping {start} to {end} "
+            "(Pending requests are not yet approved):\n" + "\n".join(lines))
 
 
 def _balance_reply(session: SessionState) -> str:

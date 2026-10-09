@@ -115,3 +115,34 @@ is an optional local-development override.
 Forecast failures are reported in activity logs and do not undo an approval or
 prevent the notification email. The request and ledger tables remain authoritative;
 the forecast is not part of their atomic transaction.
+
+## Reuse the forecast service account on Render
+
+No second service account is needed. Both adapters use the same
+`GOOGLE_SERVICE_ACCOUNT_JSON` environment variable; when populated it takes
+precedence over credential file settings. Upload the original downloaded JSON
+as a private Render environment value, preserving its JSON escaping.
+
+Keep the existing forecast settings:
+
+```text
+GOOGLE_SHEET_ID=1Cuo-5q-mWsdGeVMVOMYp3RqAOYbDTStQAOz_aTz1j-c
+GOOGLE_SHEET_TAB=Leave Tracker
+```
+
+For persistent records, separately set:
+
+```text
+GOOGLE_SHEETS_SPREADSHEET_ID=1ItLM27vcTfpyeuZBQeuhFTvz86ERTqpSG4zpOOapysk
+```
+
+Share that persistence workbook with the `client_email` from the downloaded
+service-account JSON as Editor. Keep the forecast workbook's existing sharing.
+Run the schema check and missing-tab setup described above before switching
+`DATA_BACKEND` to `google_sheets`. The monthly `Leave Tracker` layout alone does
+not provide the request, balance, account and approval-token tables.
+
+If a private key has been pasted into chat or another shared location, replace
+it in Render and revoke the exposed key in Google Cloud. The service account
+itself and its workbook permissions can stay the same. Never copy the key into
+this document or any tracked file.

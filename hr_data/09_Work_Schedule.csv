@@ -1,3 +1,0 @@
-work_schedule_code,work_schedule_name,mon_hours,tue_hours,wed_hours,thu_hours,fri_hours,sat_hours,sun_hours,weekend_mask
-SG_STD,Singapore standard Mon-Fri,8,8,8,8,8,0,0,0000011
-SG_MON_THU,"4-day week Mon-Thu (example, not assigned)",8,8,8,8,0,0,0,0000111

@@ -1,6 +1,0 @@
-team_id,team_name,head_employee_id,headcount,min_staff_on_duty,notes
-T01,Man Age Men-T,E001,1,1,Leadership
-T02,Empty'em,E004,5,3,At least 3 engineers must be on duty each working day
-T03,Diva Counter Strike,E009,5,2,At least 2 sales staff must be on duty each working day
-T04,Apple Computer Science,E013,4,2,At least 2 operations staff must be on duty each working day
-T05,Meow Woof Arf,E002,3,1,At least 1 HR staff must be on duty each working day

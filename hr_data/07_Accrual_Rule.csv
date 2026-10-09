@@ -1,6 +1,0 @@
-accrual_rule_code,tier_id,min_years_service,max_years_service,annual_days,posting_frequency,first_posting_rule,description
-AL_ACCRUAL,P1,0,3,15,Monthly,No accrual in the hire month,0 to 3 completed years of service
-AL_ACCRUAL,P2,4,7,18,Monthly,No accrual in the hire month,4 to 7 completed years of service
-AL_ACCRUAL,P3,8,99,21,Monthly,No accrual in the hire month,8 or more completed years of service
-SL_ENTITLE,P1,0,99,14,Annual,"Posted on 1 Jan, or on hire date in the hire year",Outpatient sick leave
-HL_ENTITLE,P1,0,99,46,Annual,"Posted on 1 Jan, or on hire date in the hire year",Hospitalisation leave on top of sick leave (60 days combined)

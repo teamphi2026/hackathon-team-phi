@@ -1,6 +1,0 @@
-time_account_type_code,time_account_type_name,account_creation_type,entitlement_method,accrual_rule_code,annual_quota_days,account_valid_from,account_valid_until,carry_over_allowed,expiry_rule,notes
-ACC_AL,Annual Leave Account,Recurring,Accrued,AL_ACCRUAL,Tiered by years of service,2026-01-01,2026-12-31,No,Unused balance expires on 31 Dec; period-end processing posts an Expiry,Monthly accrual posted on the 1st; none in the hire month
-ACC_OIL,Off-in-Lieu Account,Recurring,Earned (ad hoc postings),,Earned,2026-01-01,2026-12-31,No,Each credit expires 3 months after its earned date (assumption); an unused credit gets an Expiry posting,Credits are posted as Ad Hoc Entitlement with an expiry_date
-ACC_SL,Sick Leave Account,Recurring,Entitled,SL_ENTITLE,14,2026-01-01,2026-12-31,No,Resets 1 Jan; unused days expire 31 Dec,First-year proration not modelled
-ACC_HL,Hospitalisation Leave Account,Recurring,Entitled,HL_ENTITLE,46,2026-01-01,2026-12-31,No,Resets 1 Jan; unused days expire 31 Dec,On top of SL; 60 days combined
-ACC_CL,Childcare Leave Account,Recurring,Entitled,,Annual quota from Entitlement_Rules,2026-01-01,2026-12-31,No,Resets 1 Jan; unused days expire 31 Dec,Quota determined by child age at 1 Jan; 6 days if child aged 7 or under

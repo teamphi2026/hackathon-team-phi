@@ -1,7 +1,0 @@
-field,value,notes
-user_id,E005,INPUT: the employee the leave is for; their work schedule and holiday calendar are looked up in Job_Information
-start_date,2026-10-26,INPUT: first day of leave (yyyy-mm-dd)
-end_date,2026-10-30,INPUT: last day of leave (yyyy-mm-dd)
-half_day,None,"INPUT: None, AM or PM. Only counts when start_date equals end_date"
-quantity_in_days,5,"OUTPUT (formula): days on the employee's work schedule minus holidays on their holiday calendar, minus 0.5 for a half day. Do not overwrite"
-holidays_in_range,0,OUTPUT (formula): holidays that fall on the employee's working days in the range. Do not overwrite

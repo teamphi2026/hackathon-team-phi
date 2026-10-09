@@ -1,8 +1,0 @@
-time_profile_code,time_type_code,available_to_employee,favorite,main_absence_time_type
-SG_STD,AL,Y,Y,Y
-SG_STD,OIL,Y,N,N
-SG_STD,SL,Y,Y,N
-SG_STD,HL,Y,N,N
-SG_STD,CL,Y,N,N
-SG_CONTRACT,AL,Y,Y,Y
-SG_CONTRACT,SL,Y,Y,N

@@ -12,11 +12,10 @@ employee_confirmed. Guardrails:
 """
 from __future__ import annotations
 
-import csv
 from datetime import date, datetime
 from typing import Any
 
-from ..config import data_file
+from .. import storage
 from ..state import get_session
 from . import hr
 from . import team_project as tp
@@ -38,18 +37,11 @@ _LEAVE_TO_ACCOUNT = {
 # ---------------------------------------------------------------------------
 
 def _read_rows(name: str) -> tuple[list[str], list[dict[str, str]]]:
-    with open(data_file(name), newline="", encoding="utf-8") as fh:
-        reader = csv.DictReader(fh)
-        rows = list(reader)
-        return reader.fieldnames or [], rows
+    return storage.read_rows(name)
 
 
 def _write_rows(name: str, header: list[str], rows: list[dict[str, str]]) -> None:
-    with open(data_file(name), "w", newline="", encoding="utf-8") as fh:
-        writer = csv.DictWriter(fh, fieldnames=header)
-        writer.writeheader()
-        for r in rows:
-            writer.writerow({k: r.get(k, "") for k in header})
+    storage.write_rows(name, header, rows)
     _invalidate_caches()
 
 
@@ -85,6 +77,7 @@ def _next_id(name: str, id_field: str, prefix: str) -> str:
 # submit_leave_request
 # ---------------------------------------------------------------------------
 
+@storage.mutation
 def submit_leave_request(
     leave_type: str,
     start_date: str,
@@ -149,6 +142,7 @@ def submit_leave_request(
 # handle_approval_token
 # ---------------------------------------------------------------------------
 
+@storage.mutation
 def handle_approval_token(token: str, action: str | None = None) -> dict[str, Any]:
     """Apply a manager decision via a single-use token.
 
@@ -157,7 +151,8 @@ def handle_approval_token(token: str, action: str | None = None) -> dict[str, An
     """
     session = get_session()
     tokens = session.approval_token_map
-    entry = tokens.get(token)
+    from .. import approval_tokens
+    entry = approval_tokens.lookup(token) if storage.using_sheets() else tokens.get(token)
 
     if entry is None:
         return {"success": False, "message": "Invalid token."}
@@ -182,7 +177,11 @@ def handle_approval_token(token: str, action: str | None = None) -> dict[str, An
             "message": f"Request {employee_time_id} is not pending (currently {target['approval_status']}).",
         }
 
-    # Mark token (and its sibling for the same request) appropriately.
+    if action and action.lower() != entry.get("action"):
+        return {"success": False, "message": "This token does not authorise that action."}
+    # Sheets token consumption commits atomically with the decision and debit.
+    if storage.using_sheets():
+        approval_tokens.consume(token)
     entry["used"] = True
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -216,6 +215,7 @@ def list_pending_for_approver(approver_id: str) -> list[dict[str, Any]]:
     return pending_manager_rows(approver_id)
 
 
+@storage.mutation
 def handle_ui_decision(employee_time_id: str, action: str,
                        approver_id: str | None = None) -> dict[str, Any]:
     """Apply a manager decision made in the UI card (no email token).

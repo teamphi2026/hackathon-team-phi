@@ -19,7 +19,7 @@ from typing import Any
 
 import pandas as pd
 
-from ..config import data_file
+from .. import storage
 from ..state import get_session
 from . import hr
 
@@ -28,8 +28,15 @@ _INACTIVE_STATUSES = {"Cancelled", "Rejected"}
 
 
 @lru_cache(maxsize=None)
+def _load_csv(name: str) -> pd.DataFrame:
+    return storage.dataframe(name)
+
+
 def _load(name: str) -> pd.DataFrame:
-    return pd.read_csv(data_file(name), dtype=str).fillna("")
+    return storage.dataframe(name) if storage.using_sheets() else _load_csv(name)
+
+
+_load.cache_clear = _load_csv.cache_clear
 
 
 def _current_user_id() -> str:

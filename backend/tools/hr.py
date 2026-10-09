@@ -20,7 +20,7 @@ from typing import Any
 
 import pandas as pd
 
-from ..config import data_file
+from .. import storage
 from ..state import get_session
 
 # ---------------------------------------------------------------------------
@@ -40,8 +40,15 @@ _DOW_COLS = [
 
 
 @lru_cache(maxsize=None)
+def _load_csv(name: str) -> pd.DataFrame:
+    return storage.dataframe(name)
+
+
 def _load(name: str) -> pd.DataFrame:
-    return pd.read_csv(data_file(name), dtype=str).fillna("")
+    return storage.dataframe(name) if storage.using_sheets() else _load_csv(name)
+
+
+_load.cache_clear = _load_csv.cache_clear
 
 
 def _current_user_id() -> str:
@@ -209,7 +216,7 @@ def get_entitlements() -> dict[str, Any]:
     ta = _load("11_Time_Account.csv")
     # Read postings fresh, just like request statuses (CSV summaries are exports,
     # not formulas that recalculate when the application writes a request).
-    detail = pd.read_csv(data_file("12_Time_Account_Detail.csv"), dtype=str).fillna("")
+    detail = storage.dataframe("12_Time_Account_Detail.csv")
     tat = _load("06_Time_Account_Type.csv")
     type_name = dict(zip(tat.time_account_type_code, tat.time_account_type_name))
 

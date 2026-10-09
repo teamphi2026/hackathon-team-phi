@@ -29,6 +29,15 @@ EMAIL_FROM = os.getenv("EMAIL_FROM", "")
 SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY", "")
 APP_BASE_URL = os.getenv("APP_BASE_URL", "http://localhost:8000")
 
+# Leave forecast Google Sheet (updated after a manager approves leave).
+# Leave GOOGLE_SHEET_ID empty to disable the feature.
+GOOGLE_SHEET_ID = os.getenv("GOOGLE_SHEET_ID", "").strip()
+GOOGLE_SHEET_TAB = os.getenv("GOOGLE_SHEET_TAB", "").strip()          # worksheet name; blank = first tab
+GOOGLE_SERVICE_ACCOUNT_JSON = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "").strip()   # the key's JSON text
+GOOGLE_SERVICE_ACCOUNT_FILE = os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE", "").strip()   # or a path to the key file
+# Local-dev alternative: write to a CSV with the same layout instead of Google (opt-in).
+LEAVE_FORECAST_CSV = os.getenv("LEAVE_FORECAST_CSV", "").strip()
+
 # LLM / orchestrator config
 ICA_API_KEY = os.getenv("ICA_API_KEY", "").strip()
 ICA_MODEL = os.getenv("ICA_MODEL", "gpt-5.4").strip()
@@ -54,3 +63,9 @@ ICA_BASE_URL = _normalize_base_url(os.getenv("ICA_BASE_URL", ""))
 def data_file(name: str) -> Path:
     """Return the full path to a CSV in hr_data/ by file name."""
     return DATA_DIR / name
+
+# Persistence. Sheets mode never silently falls back to ephemeral CSV writes.
+DATA_BACKEND = os.getenv("DATA_BACKEND", "csv").strip().lower()
+GOOGLE_SHEETS_SPREADSHEET_ID = os.getenv("GOOGLE_SHEETS_SPREADSHEET_ID", "").strip()
+# Optional JSON mapping: {"13_Employee_Time.csv": "Employee_Time"}
+GOOGLE_SHEETS_TAB_MAP = os.getenv("GOOGLE_SHEETS_TAB_MAP", "{}").strip()

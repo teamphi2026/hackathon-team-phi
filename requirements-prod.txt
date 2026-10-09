@@ -6,3 +6,7 @@ uvicorn==0.39.0
 pandas==2.3.3
 python-dotenv==1.2.1
 openai==2.48.0
+
+# Google Sheets service-account authentication and HTTP transport
+google-auth[requests]==2.61.0
+gspread==6.2.1

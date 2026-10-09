@@ -49,7 +49,12 @@ def _employer_for_user(uid: str) -> dict[str, str]:
     row = next((c for c in companies if _norm(c.get("company_name", "")) == _norm(employer)), None)
     if row:
         out["company_id"] = row.get("company_id", "")
-        out["policy_file"] = (row.get("policy_file") or "").strip()
+        policy_file = (row.get("policy_file") or "").strip()
+        # Existing Sheets company rows may still reference the renamed documents.
+        out["policy_file"] = {
+            "i_be_yam_leave_policy.md": "I_Be_Yam_Leave_Plan_Singapore.md",
+            "he_be_tomato_leave_policy.md": "He_Be_Tomato_Leave_Policy_Singapore.md",
+        }.get(policy_file, policy_file)
     return out
 
 

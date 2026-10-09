@@ -22,6 +22,7 @@ def _deterministic_mode(monkeypatch):
     them here keeps the suite offline and reproducible. The LLM-path tests
     re-enable credentials explicitly within their own test bodies.
     """
+    monkeypatch.setattr(config, "DATA_BACKEND", "csv")
     monkeypatch.setattr(config, "ICA_API_KEY", "")
     monkeypatch.setattr(config, "ICA_BASE_URL", "")
 

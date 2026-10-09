@@ -13,13 +13,12 @@ sessions for production).
 """
 from __future__ import annotations
 
-import csv
 import hashlib
 import os
 import secrets
 from typing import Any
 
-from .config import data_file
+from . import storage
 
 USERS_FILE = "21_Users.csv"
 _FIELDS = ["username", "salt", "password_hash", "user_id", "display_name"]
@@ -42,18 +41,17 @@ def _hash(password: str, salt: str) -> str:
 
 def _read_users() -> list[dict[str, str]]:
     try:
-        with open(data_file(USERS_FILE), newline="", encoding="utf-8") as fh:
-            return list(csv.DictReader(fh))
+        return storage.read_rows(USERS_FILE)[1]
     except FileNotFoundError:
         return []
 
 
 def _write_users(rows: list[dict[str, str]]) -> None:
-    with open(data_file(USERS_FILE), "w", newline="", encoding="utf-8") as fh:
-        writer = csv.DictWriter(fh, fieldnames=_FIELDS)
-        writer.writeheader()
-        for r in rows:
-            writer.writerow({k: r.get(k, "") for k in _FIELDS})
+    try:
+        header = storage.read_rows(USERS_FILE)[0]
+    except FileNotFoundError:
+        header = _FIELDS
+    storage.write_rows(USERS_FILE, header, rows)
 
 
 def _find_user(username: str) -> dict[str, str] | None:
@@ -62,17 +60,15 @@ def _find_user(username: str) -> dict[str, str] | None:
 
 
 def _employee_exists(user_id: str) -> dict[str, str] | None:
-    with open(data_file("02_Job_Information.csv"), newline="", encoding="utf-8") as fh:
-        for r in csv.DictReader(fh):
-            if r["user_id"] == user_id:
-                return r
-    return None
+    return next((r for r in storage.read_rows("02_Job_Information.csv")[1]
+                 if r["user_id"] == user_id), None)
 
 
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
+@storage.mutation
 def register(username: str, password: str, user_id: str) -> dict[str, Any]:
     """Create a new user mapped to an existing employee. Returns {success,...}."""
     username = (username or "").strip()
@@ -100,6 +96,7 @@ def register(username: str, password: str, user_id: str) -> dict[str, Any]:
             "display_name": row["display_name"]}
 
 
+@storage.scoped
 def login(username: str, password: str) -> dict[str, Any]:
     """Validate credentials and issue a bearer token. Returns {success, token,...}."""
     user = _find_user(username or "")

@@ -21,7 +21,7 @@ import re
 from datetime import date, datetime, timedelta
 from typing import Any, Callable
 
-from . import activity_text, config, filters, suggestions, leave_intents
+from . import activity_text, config, filters, suggestions, leave_intents, storage
 from .state import SessionState, get_session
 from .tool_logger import call_tool, log_intent, log_llm_call
 from .tools import actions, hr, policy_rag, leave_queries
@@ -190,6 +190,7 @@ def _run_tool(name: str, label: str, status: str = "working", **kwargs) -> Any:
 # Public entry point
 # ---------------------------------------------------------------------------
 
+@storage.scoped
 def handle_message(message: str) -> dict[str, Any]:
     """Process one chat turn and return {reply, activity}.
 

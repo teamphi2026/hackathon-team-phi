@@ -1,7 +1,7 @@
 # Render blueprint for the FastAPI backend (Vercel serves only the static pages).
-# The app keeps sessions/login tokens in memory and writes leave requests to the
-# CSV files, so it must run as ONE long-lived process (1 worker, 1 instance).
-# Note: Render's disk is ephemeral, so CSV changes reset on redeploy/restart (fine for a demo).
+# Run ONE worker and ONE instance: writes and session identity are serialized.
+# Configure google_sheets after following docs/google-sheets-storage.md.
+# CSV mode is local/demo only; Render's filesystem is ephemeral.
 services:
   - type: web
     name: leave-agent-api
@@ -11,6 +11,13 @@ services:
     startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT --workers 1
     healthCheckPath: /api/health
     envVars:
+      - key: DATA_BACKEND
+        sync: false
+      - key: GOOGLE_SHEETS_SPREADSHEET_ID
+        value: 1ItLM27vcTfpyeuZBQeuhFTvz86ERTqpSG4zpOOapysk
+      # Add google-service-account.json under Render > Secret Files.
+      - key: GOOGLE_APPLICATION_CREDENTIALS
+        value: /etc/secrets/google-service-account.json
       - key: PYTHON_VERSION
         value: 3.11.9
       # Secrets: enter these in the Render dashboard (never commit them).

@@ -791,6 +791,7 @@
       </div>
 
       <!-- Manager Approval Card -->
+      <div id="approvalStorageError" role="status" style="display:none; color:var(--amber); font-size:12px; padding:12px 16px;"></div>
       <div class="approval-section" id="approvalSection">
         <div class="approval-card">
           <div class="approval-title">Manager Approval Required</div>
@@ -1307,6 +1308,7 @@
     // --- Manager approval card: only shown to the assigned approver ----------
     let currentApprovalId = null;
     let pendingList = [];       // every ticket awaiting this user's decision
+    let approvalStorageUnavailable = false;
     let pendingIdx = 0;         // which one the card is showing
     let deciding = false;       // true while an approve/reject call is in flight
 
@@ -1331,7 +1333,7 @@
       document.getElementById('aprPrev').disabled = !multi;
       document.getElementById('aprNext').disabled = !multi;
       for (const id of ['btnApprove', 'btnReject']) {
-        document.getElementById(id).disabled = deciding;   // locked only mid-request
+        document.getElementById(id).disabled = deciding || approvalStorageUnavailable;   // locked only mid-request
       }
       section.classList.add('visible');
     }
@@ -1346,7 +1348,11 @@
     async function refreshPendingApprovals() {
       try {
         const res = await authFetch('/api/pending-approvals');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const { pending } = await res.json();
+        if (!Array.isArray(pending)) throw new Error('Invalid approval response');
+        approvalStorageUnavailable = false;
+        document.getElementById('approvalStorageError').style.display = 'none';
         // Only tickets awaiting THIS user's decision, newest first.
         const list = (pending || []).slice().reverse();
         // Stay on the ticket being viewed if it is still pending; otherwise keep
@@ -1355,7 +1361,13 @@
         if (keep >= 0) pendingIdx = keep;
         pendingList = list;
         renderApprovalCard();
-      } catch (e) { /* non-fatal; authFetch handles 401 */ }
+      } catch (e) {
+        approvalStorageUnavailable = true;
+        const notice = document.getElementById('approvalStorageError');
+        notice.textContent = 'Unable to refresh approvals. Previously loaded requests may be out of date. Retrying shortly.';
+        notice.style.display = 'block';
+        renderApprovalCard();
+      }
     }
 
     window.addEventListener('DOMContentLoaded', () => {

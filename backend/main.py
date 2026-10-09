@@ -11,20 +11,30 @@ from __future__ import annotations
 import asyncio
 import html
 import json
+from contextlib import asynccontextmanager
 
 from typing import Optional
 
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
 from pydantic import BaseModel
 
-from . import agent, auth, email_service, suggestions
+from . import agent, auth, email_service, suggestions, storage, config
 from .state import get_session
 from .tools import actions
 from .tools import team_project as tp
 
-app = FastAPI(title="Project-Aware Leave Planning Agent")
+@asynccontextmanager
+async def lifespan(app):
+    # Refuse to serve a deployment with an unusable remote source of truth.
+    if storage.using_sheets():
+        with storage.operation():
+            storage.read_rows("13_Employee_Time.csv")
+    yield
+
+
+app = FastAPI(title="Project-Aware Leave Planning Agent", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -32,6 +42,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(storage.StorageError)
+async def storage_failure(request, exc):
+    return JSONResponse(status_code=503, content={"detail": str(exc)})
 
 
 # ---------------------------------------------------------------------------
@@ -82,7 +97,7 @@ class Registration(BaseModel):
 
 @app.get("/api/health")
 def health() -> dict[str, str]:
-    return {"status": "ok"}
+    return {"status": "ok", "data_backend": config.DATA_BACKEND}
 
 
 # ---------------------------------------------------------------------------
@@ -90,6 +105,7 @@ def health() -> dict[str, str]:
 # ---------------------------------------------------------------------------
 
 @app.post("/api/register")
+@storage.scoped
 def register(req: Registration) -> dict:
     result = auth.register(req.username, req.password, req.user_id)
     if not result.get("success"):
@@ -98,6 +114,7 @@ def register(req: Registration) -> dict:
 
 
 @app.post("/api/login")
+@storage.scoped
 def login(req: Credentials) -> dict:
     result = auth.login(req.username, req.password)
     if not result.get("success"):
@@ -106,17 +123,20 @@ def login(req: Credentials) -> dict:
 
 
 @app.post("/api/logout")
+@storage.scoped
 def logout(authorization: Optional[str] = Header(default=None)) -> dict:
     return auth.logout(_bearer(authorization) or "")
 
 
 @app.get("/api/me")
+@storage.scoped
 def me(authorization: Optional[str] = Header(default=None)) -> dict:
     user_id = _require_identity(authorization)
     return auth.user_info(user_id)
 
 
 @app.post("/api/chat")
+@storage.scoped
 def chat(req: ChatRequest, authorization: Optional[str] = Header(default=None)) -> dict:
     """Main chat endpoint — delegates to the orchestrator agent."""
     _require_identity(authorization)
@@ -136,6 +156,7 @@ def _notify_employee(result: dict) -> dict:
 
 
 @app.get("/api/suggestions")
+@storage.scoped
 def get_suggestions(authorization: Optional[str] = Header(default=None)) -> dict:
     """Dynamic follow-up chips for the chat box, based on this session's history."""
     _require_identity(authorization)
@@ -143,6 +164,7 @@ def get_suggestions(authorization: Optional[str] = Header(default=None)) -> dict
 
 
 @app.post("/api/approval/{token}")
+@storage.scoped
 def approval(token: str, action: str = "approve") -> dict:
     """Manager Approve/Reject token callback.
 
@@ -177,6 +199,7 @@ class UIApproval(BaseModel):
 
 
 @app.get("/api/pending-approvals")
+@storage.scoped
 def pending_approvals(authorization: Optional[str] = Header(default=None)) -> dict:
     """Requests awaiting THIS user's decision. Empty for non-approvers, so the
     approval card only ever shows on the manager's account."""
@@ -185,6 +208,7 @@ def pending_approvals(authorization: Optional[str] = Header(default=None)) -> di
 
 
 @app.post("/api/ui-approval")
+@storage.scoped
 def ui_approval(req: UIApproval, authorization: Optional[str] = Header(default=None)) -> dict:
     """Manager decision made in the UI card (not via an email token).
 
@@ -197,6 +221,7 @@ def ui_approval(req: UIApproval, authorization: Optional[str] = Header(default=N
 
 
 @app.get("/api/team-calendar")
+@storage.scoped
 def team_calendar(year: int, month: int,
                   authorization: Optional[str] = Header(default=None)) -> dict:
     """Month calendar of the logged-in user's teams: named leave + coverage."""
@@ -207,6 +232,7 @@ def team_calendar(year: int, month: int,
 
 
 @app.get("/api/session-state")
+@storage.scoped
 def session_state(authorization: Optional[str] = Header(default=None)) -> dict:
     """Snapshot of workflow state for the manager approval UI card."""
     _require_identity(authorization)
@@ -222,6 +248,7 @@ def session_state(authorization: Optional[str] = Header(default=None)) -> dict:
 
 
 @app.post("/api/reset")
+@storage.scoped
 def reset() -> dict[str, str]:
     get_session().reset()
     return {"status": "reset"}

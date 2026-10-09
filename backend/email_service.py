@@ -21,7 +21,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Any
 
-from . import config
+from . import config, storage, approval_tokens
 from .state import get_session
 from .tool_logger import log_email
 from .tools import actions, hr
@@ -36,12 +36,15 @@ TOKEN_TTL = timedelta(hours=24)
 
 def _new_token(employee_time_id: str, action: str) -> str:
     token = uuid.uuid4().hex
-    get_session().approval_token_map[token] = {
+    entry = {
         "employee_time_id": employee_time_id,
         "action": action,
         "expiry": datetime.now() + TOKEN_TTL,
         "used": False,
     }
+    if storage.using_sheets():
+        approval_tokens.save(token, entry)
+    get_session().approval_token_map[token] = entry
     return token
 
 
@@ -181,8 +184,10 @@ def send_approval_email(employee_time_id: str) -> dict[str, Any]:
     manager = _employee(req["approver_id"])
     manager_email = manager.get("email", "")
 
-    approve_token = _new_token(employee_time_id, "approve")
-    reject_token = _new_token(employee_time_id, "reject")
+    # Commit both persistent tokens before sending the email containing the links.
+    with storage.transaction():
+        approve_token = _new_token(employee_time_id, "approve")
+        reject_token = _new_token(employee_time_id, "reject")
     log_email("tokens_issued", {"kind": "approval_request", "employee_time_id": employee_time_id,
                                 "ttl_hours": TOKEN_TTL.total_seconds() / 3600})
     approve_url = _approval_link(approve_token, "approve")

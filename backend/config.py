@@ -54,3 +54,9 @@ ICA_BASE_URL = _normalize_base_url(os.getenv("ICA_BASE_URL", ""))
 def data_file(name: str) -> Path:
     """Return the full path to a CSV in hr_data/ by file name."""
     return DATA_DIR / name
+
+# Persistence. Sheets mode never silently falls back to ephemeral CSV writes.
+DATA_BACKEND = os.getenv("DATA_BACKEND", "csv").strip().lower()
+GOOGLE_SHEETS_SPREADSHEET_ID = os.getenv("GOOGLE_SHEETS_SPREADSHEET_ID", "").strip()
+# Optional JSON mapping: {"13_Employee_Time.csv": "Employee_Time"}
+GOOGLE_SHEETS_TAB_MAP = os.getenv("GOOGLE_SHEETS_TAB_MAP", "{}").strip()

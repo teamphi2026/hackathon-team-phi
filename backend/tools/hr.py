@@ -197,13 +197,19 @@ def check_childcare_eligibility(reference_year: int | None = None) -> dict[str, 
 # ---------------------------------------------------------------------------
 
 def get_entitlements() -> dict[str, Any]:
-    """Return the session user's leave balances from Time_Account.
+    """Return live balances using account credits and authoritative request rows.
 
     For CL the available figure is gated on childcare eligibility.
     For OIL any credit expiring within 30 days is flagged.
     """
+    from . import leave_queries
+    requests = leave_queries.get_employee_leave_requests()
+    pending = [r for r in requests["requests"] if r["status"] == leave_queries.PENDING]
     uid = _current_user_id()
     ta = _load("11_Time_Account.csv")
+    # Read postings fresh, just like request statuses (CSV summaries are exports,
+    # not formulas that recalculate when the application writes a request).
+    detail = pd.read_csv(data_file("12_Time_Account_Detail.csv"), dtype=str).fillna("")
     tat = _load("06_Time_Account_Type.csv")
     type_name = dict(zip(tat.time_account_type_code, tat.time_account_type_name))
 
@@ -214,17 +220,39 @@ def get_entitlements() -> dict[str, Any]:
     rows = ta[(ta.user_id == uid) & (ta.account_closed != "Y")]
     for _, r in rows.iterrows():
         acc_type = r["time_account_type_code"]
-        available = _to_num(r["available"]) or 0.0
+        leave_type = acc_to_leave.get(acc_type, acc_type)
+        relevant = [q for q in requests["requests"] if q["leave_type"] == leave_type
+                    and r["account_valid_from"] <= q["start_date"] <= r["account_valid_until"]]
+        reserved = sum(float(q["working_days"]) for q in relevant if q["status"] == leave_queries.PENDING)
+        approved = [q for q in relevant if q["status"] == leave_queries.APPROVED]
+        today = date.today().isoformat()
+        credits = detail[(detail.time_account_id == r["time_account_id"])
+                         & (detail.posting_type != "Employee Time")]
+        # Some imported accounts (e.g. Childcare Leave) only have an opening
+        # balance and no entitlement postings. Retain that opening credit.
+        credited = (sum(_to_num(c["booking_amount"]) or 0.0 for _, c in credits.iterrows()
+                        if c["booking_date"] <= today)
+                    if not credits.empty else (_to_num(r["balance_today"]) or 0.0))
+        # Count each Approved request exactly once. Legacy data contains duplicate
+        # debit postings and even a debit for a Pending request; these must not
+        # double-charge leave or override the authoritative request status.
+        balance = credited - sum(float(q["working_days"]) for q in approved if q["start_date"] <= today)
+        planned = -sum(float(q["working_days"]) for q in approved if q["start_date"] > today)
+        available = round(balance + planned - reserved, 2)
+        # Retain the imported future-accrual forecast while applying live usage.
+        forecast_credit = (_to_num(r["projected_year_end"]) or 0.0) - (_to_num(r["available"]) or 0.0)
         entry: dict[str, Any] = {
             "time_account_id": r["time_account_id"],
             "account_type": acc_type,
             # Bookable leave-type code (e.g. "AL") so the agent maps names to codes.
             "leave_type": acc_to_leave.get(acc_type, acc_type),
             "account_name": type_name.get(acc_type, acc_type),
-            "balance_today": _to_num(r["balance_today"]) or 0.0,
-            "pending_requests": _to_num(r["pending_requests"]) or 0.0,
+            "balance_today": round(balance, 2),
+            "planned_bookings": planned,
+            "pending_requests": reserved,  # days reserved, not a request count
+            "pending_request_count": sum(q["status"] == leave_queries.PENDING for q in relevant),
             "available": available,
-            "projected_year_end": _to_num(r["projected_year_end"]) or 0.0,
+            "projected_year_end": round(available + forecast_credit, 2),
         }
         if acc_type == "ACC_CL":
             elig = check_childcare_eligibility()
@@ -237,7 +265,9 @@ def get_entitlements() -> dict[str, Any]:
             entry["expiry_warning"] = _oil_expiry_warning(uid)
         accounts.append(entry)
 
-    return {"user_id": uid, "accounts": accounts}
+    return {"user_id": uid, "accounts": accounts,
+            "pending_request_count": len(pending), "pending_requests": pending,
+            "balance_policy": "Pending leave is reserved from availability; only Approved leave is deducted."}
 
 
 def _oil_expiry_warning(uid: str) -> str | None:
@@ -404,16 +434,9 @@ def validate_policy(
     remaining_after: float | None = None
     acc_type = _LEAVE_TO_ACCOUNT.get(leave_type)
     if acc_type:
-        ta = _load("11_Time_Account.csv")
-        acc = ta[(ta.user_id == uid) & (ta.time_account_type_code == acc_type)]
-        if acc.empty:
-            available = 0.0
-        else:
-            available = _to_num(acc.iloc[0]["available"]) or 0.0
-            if acc_type == "ACC_CL":
-                elig = check_childcare_eligibility()
-                if not elig["eligible"]:
-                    available = 0.0
+        account = next((a for a in get_entitlements()["accounts"]
+                        if a["account_type"] == acc_type), None)
+        available = account["available"] if account else 0.0
         remaining_after = round(available - working_days, 2)
         if working_days > available:
             violations.append(

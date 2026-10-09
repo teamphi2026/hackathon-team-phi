@@ -11,7 +11,7 @@ from datetime import date, timedelta
 from typing import Any
 
 from .state import SessionState
-from .tools import actions
+from .tools import leave_queries
 
 MAX_CHIPS = 3
 
@@ -39,10 +39,10 @@ def _explored(session: SessionState) -> set[str]:
 def _latest_pending_request(user_id: str) -> str | None:
     """Reference id of the user's most recent request still awaiting a decision."""
     try:
-        _, rows = actions._read_rows(actions.EMPLOYEE_TIME)
+        rows = leave_queries.employee_request_rows(user_id)
     except OSError:
         return None
-    mine = [r for r in rows if r["user_id"] == user_id and r["approval_status"] == "Pending"]
+    mine = [r for r in rows if r["approval_status"] == leave_queries.PENDING]
     return mine[-1]["employee_time_id"] if mine else None
 
 

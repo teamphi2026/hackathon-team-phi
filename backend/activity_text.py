@@ -114,6 +114,13 @@ def describe(name: str, args: dict[str, Any], result: Any) -> tuple[str, str] | 
             return "info", f"Searched the {who} leave policy: nothing relevant found"
         return "ok", f"Searched the {who} leave policy: matched the '{cites[0]['section']}' section"
 
+    if name == "get_pending_manager_approvals":
+        return "ok", f"Checked requests awaiting your approval: {r.get('count', 0)} pending"
+
+    if name == "get_employee_leave_requests":
+        return "ok", (f"Checked your personal leave requests: {r.get('count', 0)} matching, "
+                      f"{r.get('pending_count', 0)} pending in total")
+
     if name == "get_request_status":
         if not r.get("found"):
             ref = args.get("reference_id")

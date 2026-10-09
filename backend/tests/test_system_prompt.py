@@ -55,4 +55,5 @@ def test_entitlements_expose_bookable_leave_type_codes():
     assert "AL" in codes
     assert "CL" in codes
     al = next(a for a in accounts if a["leave_type"] == "AL")
-    assert al["available"] == 5.0
+    # Live availability includes the 3-day approval R020 absent from the CSV summary.
+    assert al["available"] == 2.0

@@ -63,6 +63,7 @@ def _invalidate_caches() -> None:
     """Drop cached DataFrames so reads reflect the new writes."""
     hr._load.cache_clear()
     tp._load.cache_clear()
+    get_session().entitlements = None
 
 
 def _next_id(name: str, id_field: str, prefix: str) -> str:
@@ -205,84 +206,14 @@ def handle_approval_token(token: str, action: str | None = None) -> dict[str, An
                 "message": f"Request {employee_time_id} rejected."}
 
 
-def _pending_rows(match) -> list[dict[str, Any]]:
-    _, rows = _read_rows(EMPLOYEE_TIME)
-    _, people = _read_rows("02_Job_Information.csv")
-    names = {p["user_id"]: p["full_name"] for p in people}
-    out = []
-    for r in rows:
-        if r["approval_status"] != "Pending" or not match(r):
-            continue
-        out.append({
-            "employee_time_id": r["employee_time_id"],
-            "employee_id": r["user_id"],
-            "employee_name": names.get(r["user_id"], r["user_id"]),
-            "leave_type": r["time_type_code"],
-            "start_date": r["start_date"],
-            "end_date": r["end_date"],
-            "date_label": hr.format_date_range(
-                date.fromisoformat(r["start_date"]), date.fromisoformat(r["end_date"])),
-            "working_days": r["quantity_in_days"],
-            "reason": r.get("reason", ""),
-            "approver_id": r["approver_id"],
-            "approver_name": names.get(r["approver_id"], r["approver_id"]),
-        })
-    return out
-
-
 def get_request_status(reference_id: str | None = None) -> dict[str, Any]:
-    """Status of the session user's leave request(s). Read-only.
-
-    With a reference id (e.g. "R019") returns that request; without one returns
-    the user's most recent requests. A request is visible only to its owner or
-    its assigned approver; anything else is reported as not found (never
-    confirming that another employee's request exists).
-    """
-    uid = get_session().session_user_id
-    _, rows = _read_rows(EMPLOYEE_TIME)
-    _, people = _read_rows("02_Job_Information.csv")
-    names = {p["user_id"]: p["full_name"] for p in people}
-
-    def shape(r: dict[str, str]) -> dict[str, Any]:
-        out = {
-            "reference_id": r["employee_time_id"],
-            "leave_type": r["time_type_code"],
-            "start_date": r["start_date"],
-            "end_date": r["end_date"],
-            "date_label": hr.format_date_range(
-                date.fromisoformat(r["start_date"]), date.fromisoformat(r["end_date"])),
-            "working_days": r["quantity_in_days"],
-            "status": r["approval_status"],
-            "submitted_at": r.get("submitted_at", ""),
-            "decided_at": r.get("decided_at", ""),
-        }
-        if r["approval_status"] == "Pending":
-            out["awaiting_approval_from"] = names.get(r["approver_id"], r["approver_id"])
-        if r["user_id"] != uid:   # approver viewing a report's request
-            out["employee_name"] = names.get(r["user_id"], r["user_id"])
-        return out
-
-    if reference_id:
-        ref = reference_id.strip().upper()
-        row = next((r for r in rows if r["employee_time_id"] == ref
-                    and uid in (r["user_id"], r["approver_id"])), None)
-        if row is None:
-            return {"found": False,
-                    "message": f"I couldn't find a request with reference {ref} on your record."}
-        return {"found": True, "requests": [shape(row)]}
-
-    mine = [r for r in rows if r["user_id"] == uid]
-    if not mine:
-        return {"found": False, "message": "You have no leave requests on record."}
-    return {"found": True, "requests": [shape(r) for r in mine[-5:]][::-1]}
+    from .leave_queries import get_request_status as lookup
+    return lookup(reference_id)
 
 
 def list_pending_for_approver(approver_id: str) -> list[dict[str, Any]]:
-    """Pending requests assigned to `approver_id` (they can approve/reject these).
-
-    Only the named approver ever sees these as actionable.
-    """
-    return _pending_rows(lambda r: r["approver_id"] == approver_id)
+    from .leave_queries import pending_manager_rows
+    return pending_manager_rows(approver_id)
 
 
 def handle_ui_decision(employee_time_id: str, action: str,

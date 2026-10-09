@@ -19,6 +19,8 @@ class SessionState:
     session_user_id: str = DEMO_USER_ID
 
     # intent
+    leave_query_scope: str | None = None
+    awaiting_query_scope: bool = False
     user_goal: str | None = None
     requested_leave_type: str | None = None
     requested_dates: tuple[str, str] | None = None

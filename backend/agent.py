@@ -21,10 +21,10 @@ import re
 from datetime import date, datetime, timedelta
 from typing import Any, Callable
 
-from . import activity_text, config, filters, suggestions
+from . import activity_text, config, filters, suggestions, leave_intents
 from .state import SessionState, get_session
 from .tool_logger import call_tool, log_intent, log_llm_call
-from .tools import actions, hr, policy_rag
+from .tools import actions, hr, policy_rag, leave_queries
 from .tools import team_project as tp
 
 # ---------------------------------------------------------------------------
@@ -45,6 +45,8 @@ TOOLS: dict[str, Callable[..., Any]] = {
     "handle_approval_token": actions.handle_approval_token,
     "search_policy": policy_rag.search_policy,
     "get_request_status": actions.get_request_status,
+    "get_employee_leave_requests": leave_queries.get_employee_leave_requests,
+    "get_pending_manager_approvals": leave_queries.get_pending_manager_approvals,
 }
 
 _CONFIRM_WORDS = re.compile(r"\b(yes|confirm|proceed|go ahead|do it|book it|sounds good)\b", re.I)
@@ -199,10 +201,23 @@ def handle_message(message: str) -> dict[str, Any]:
     session.turn_tools = []
     mode = "llm" if _llm_enabled() else "deterministic"
     log_intent("user_message", {"mode": mode, "message": message})
-    if _llm_enabled():
-        reply = _route_llm(message, session)
+    query = leave_intents.recognize(message, session)
+    if query and query.get("clarify"):
+        session.awaiting_query_scope = True
+        reply = leave_intents.CLARIFICATION
+        # Keep the clarification available to natural-language follow-ups.
+        if session.conversation:
+            session.conversation.extend([{"role": "user", "content": message},
+                                         {"role": "assistant", "content": reply}])
     else:
-        reply = _route(message, session)
+        session.awaiting_query_scope = False
+        session.leave_query_scope = query.get("scope") if query else None
+        if _llm_enabled():
+            reply = _route_llm(message, session, query=query)
+        elif query:
+            reply = _query_reply(query)
+        else:
+            reply = _route(message, session)
     reply = filters.filter_output(reply)
     session.history.append({"message": message, "tools": list(session.turn_tools)})
     del session.history[:-50]  # keep the history bounded
@@ -317,7 +332,7 @@ def _system_prompt() -> str:
         "blocker you should steer away from.\n"
         "5. Ask at most one clarifying question, and only if dates are genuinely "
         "missing or ambiguous. Prefer sensible defaults over interrogating.\n\n"
-        "POLICY: Leave policies differ by employer. For ANY question about entitlements, "
+        "POLICY: Leave policies differ by employer. For policy questions about entitlements, "
         "rules, eligibility, carry-over or approval, call search_policy and answer only "
         "from the returned text, naming the employer and the section (e.g. 'Under the "
         "He Be Tomato policy, Annual Leave…'). Never answer policy questions from memory "
@@ -327,6 +342,17 @@ def _system_prompt() -> str:
         "team, years of service, manager) call get_employee_profile and answer from "
         "its fields. The employer is the profile's 'employer' value; NEVER infer it "
         "from the email domain or guess. If a field is missing, say you don't have it.\n\n"
+        "LIVE REQUESTS: Personal leave balances come from get_entitlements, including "
+        "its live pending_request_count and pending_requests. Account-level pending_requests "
+        "means DAYS reserved, not number of requests. For personal history or pending leave "
+        "call get_employee_leave_requests (status='Pending' for pending only). For requests "
+        "awaiting the signed-in user's approval, including team pending requests, call "
+        "get_pending_manager_approvals. These are separate scopes even when a manager has "
+        "personal leave. For ambiguous 'Any pending leave?' ask whether they mean personal "
+        "requests or approvals when context is unclear. Always call the relevant tool again "
+        "on each query; never reuse conversational statuses or infer an empty queue. Manager "
+        "results are read-only; direct decisions to the Manager Approval Required panel. "
+        "You may report names and leave types returned by that authorised approval tool.\n\n"
         "STATUS: For questions about a submitted request ('status of R019', 'did my "
         "leave get approved', 'my pending requests') call get_request_status — pass "
         "the reference id if given, otherwise omit it. Report status, dates (use "
@@ -348,7 +374,8 @@ def _system_prompt() -> str:
         "dates.\n\n"
         "RULES: Never invent balances, dates, working-day counts, or approvals — "
         "always use the tools. You may share teammate names and availability returned "
-        "by get_team_leave. Never reveal other employees' ids, emails, leave types "
+        "by get_team_leave, and authorised request details from the manager approval tool. "
+        "Never reveal other employees' ids, emails, unauthorised leave types "
         "or leave reasons; describe their absence as 'out of office'. "
         "Keep replies concise and friendly."
     )
@@ -398,9 +425,20 @@ def _tool_schema() -> list[dict[str, Any]]:
          "description": "Search the company leave policy.",
          "parameters": {"type": "object", "properties": {"question": {"type": "string"}},
                         "required": ["question"]}}},
+        {"type": "function", "function": {"name": "get_employee_leave_requests",
+         "description": "Live personal requests SUBMITTED BY the signed-in user. Includes all history; "
+                        "use status Pending for their own pending leave. Not the manager approval queue.",
+         "parameters": {"type": "object", "properties": {
+             "status": {"type": "string", "enum": ["Pending", "Approved", "Rejected", "Cancelled"]},
+             "reference_id": {"type": "string"}}, "additionalProperties": False}}},
+        {"type": "function", "function": {"name": "get_pending_manager_approvals",
+         "description": "Live requests ASSIGNED TO the signed-in user for approval, exactly the Manager "
+                        "Approval Required panel queue. Use for pending my approval, team pending leave, "
+                        "outstanding approvals and requests requiring my action. Never personal leave.",
+         "parameters": {"type": "object", "properties": {}, "additionalProperties": False}}},
         {"type": "function", "function": {"name": "get_request_status",
          "description": "Look up the status of the employee's leave request by reference id "
-                        "(e.g. R019). With no reference id, lists their most recent requests.",
+                        "(e.g. R019). With no reference id, lists all their personal requests.",
          "parameters": {"type": "object", "properties": {"reference_id": {"type": "string"}}}}},
         {"type": "function", "function": {"name": "submit_leave_request",
          "description": "Submit a confirmed leave request (requires prior employee confirmation).",
@@ -411,12 +449,12 @@ def _tool_schema() -> list[dict[str, Any]]:
     ]
 
 
-def _route_llm(message: str, session: SessionState) -> str:  # pragma: no cover - needs live creds
+def _route_llm(message: str, session: SessionState, query: dict | None = None) -> str:  # pragma: no cover - needs live creds
     """Drive the conversation with the ICA model and server-side tool execution."""
     try:
         from openai import OpenAI
     except Exception:
-        return _route(message, session)
+        return _query_reply(query) if query else _route(message, session)
 
     client = OpenAI(api_key=config.ICA_API_KEY, base_url=config.ICA_BASE_URL)
     import json as _json
@@ -434,11 +472,20 @@ def _route_llm(message: str, session: SessionState) -> str:  # pragma: no cover 
     messages.append({"role": "user", "content": message})
 
     final_reply = "I wasn't able to complete that — please try rephrasing."
-    for _ in range(8):  # bounded tool-call loop
+    for round_index in range(8):  # bounded tool-call loop
         started = _time.perf_counter()
         try:
+            options = {}
+            if query and round_index == 0:
+                # Explicit live-data queries must retrieve records this turn,
+                # regardless of stale answers present in conversation history.
+                options["tool_choice"] = {"type": "function", "function": {"name": query["name"]}}
+            elif query:
+                options["tool_choice"] = "none"
             resp = client.chat.completions.create(
-                model=config.ICA_MODEL, messages=messages, tools=_tool_schema(),
+                model=config.ICA_MODEL, messages=messages,
+                tools=[t for t in _tool_schema() if not query or t["function"]["name"] == query["name"]],
+                **options,
             )
         except Exception as exc:
             dur = round((_time.perf_counter() - started) * 1000, 1)
@@ -466,19 +513,33 @@ def _route_llm(message: str, session: SessionState) -> str:  # pragma: no cover 
         log_intent("llm_reasoning", {"content": choice.content or "", "tool_calls": tool_calls})
         if not choice.tool_calls:
             final_reply = choice.content or ""
+            if query and query["name"] not in session.turn_tools:
+                # Defensive fallback for endpoints that ignore forced tool choice.
+                final_reply = _query_reply(query)
             messages.append({"role": "assistant", "content": final_reply})
             break
         messages.append({"role": "assistant", "content": choice.content,
-                         "tool_calls": [tc.model_dump() for tc in choice.tool_calls]})
+                         "tool_calls": [
+                             {"id": tc.id, "type": "function", "function": {
+                                 "name": query["name"], "arguments": _json.dumps(query["args"])}}
+                             if query else tc.model_dump() for tc in choice.tool_calls]})
         for tc in choice.tool_calls:
             name = tc.function.name
-            args = _json.loads(tc.function.arguments or "{}")
+            args = _json.loads(tc.function.arguments or "{}") if not query else query["args"]
+            if query:
+                # Scope/filter are from explicit intent, never model-supplied ids.
+                # No personal-history tool may substitute for a manager query.
+                name, args = query["name"], query["args"]
             # employee confirmation is a precondition enforced server-side.
             if name == "submit_leave_request" and not session.employee_confirmed:
                 session.employee_confirmed = True
             session.turn_tools.append(name)
             result = call_tool(name, TOOLS[name], **args) if name in TOOLS else {"error": "unknown tool"}
             _log_step(name, args, result)
+            if name == "get_pending_manager_approvals":
+                session.leave_query_scope = "manager"
+            elif name in {"get_employee_leave_requests", "get_entitlements", "get_request_status"}:
+                session.leave_query_scope = "employee"
             if name == "validate_policy" and isinstance(result, dict) and result.get("valid"):
                 session.last_assessed = {
                     "leave_type": args.get("leave_type"), "start_date": args.get("start_date"),
@@ -619,17 +680,51 @@ def _team_leave_reply(message: str) -> str:
             "(Pending requests are not yet approved):\n" + "\n".join(lines))
 
 
+def _request_table(requests: list[dict], manager: bool = False) -> str:
+    headers = "| Reference | " + ("Employee | " if manager else "") + "Leave type | Dates | Working days (days) | Status |"
+    lines = [headers, "| " + " | ".join(["---"] * (7 if manager else 6)) + " |"]
+    for r in requests:
+        status = ("Pending your approval" if manager else
+                  (f"Pending approval from {r['awaiting_approval_from']}" if r["status"] == "Pending" else r["status"]))
+        cells = [r["reference_id"]] + ([r["employee_name"]] if manager else [])
+        cells += [activity_text._leave(r["leave_type"]), r["date_label"], str(r["working_days"]), status]
+        lines.append("| " + " | ".join(c.replace("|", "\\|").replace("\n", " ") for c in cells) + " |")
+    return "\n".join(lines)
+
+
+def _format_query_result(name: str, result: dict) -> str:
+    if name == "get_entitlements":
+        lines = ["Here's your current leave balance:", "", "| Leave type | Available (days) | Notes |", "| --- | ---: | --- |"]
+        for a in result["accounts"]:
+            note = a.get("note", "").replace("|", "\\|").replace("\n", " ")
+            lines.append(f"| {activity_text._leave(a['leave_type'])} | {a['available']:g} | {note} |")
+        lines += ["", result["balance_policy"]]
+        pending = result["pending_requests"]
+        if pending:
+            lines += ["", f"You also have {len(pending)} pending leave request(s):", "", _request_table(pending)]
+        else:
+            lines += ["", "You have no pending leave requests."]
+        return "\n".join(lines)
+    manager = name == "get_pending_manager_approvals"
+    requests = result.get("requests", [])
+    if not requests:
+        if manager:
+            return "You currently have no leave requests awaiting your approval."
+        return result.get("message", "You have no matching personal leave requests.")
+    intro = (f"You have {len(requests)} leave request(s) awaiting your approval." if manager
+             else f"Here are your {len(requests)} matching leave request(s):")
+    tail = ("\n\nYou can review and approve or reject these requests using the Manager Approval Required panel."
+            if manager else "")
+    return intro + "\n\n" + _request_table(requests, manager) + tail
+
+
+def _query_reply(query: dict) -> str:
+    result = _run_tool(query["name"], "Looking up live leave records", **query["args"])
+    return _format_query_result(query["name"], result)
+
+
 def _balance_reply(session: SessionState) -> str:
-    _run_tool("get_employee_profile", "Retrieving employee profile")
-    ent = _run_tool("get_entitlements", "Fetching leave entitlements", status="ok")
-    lines = []
-    for a in ent["accounts"]:
-        label = {"ACC_AL": "Annual Leave", "ACC_OIL": "Off-in-Lieu", "ACC_SL": "Sick Leave",
-                 "ACC_HL": "Hospitalisation Leave", "ACC_CL": "Childcare Leave"}.get(
-                     a["account_type"], a["account_type"])
-        note = f" ({a['note']})" if a.get("note") else ""
-        lines.append(f"- {label}: {a['available']} day(s) available{note}")
-    return "Here's your current leave balance:\n" + "\n".join(lines)
+    return _query_reply({"name": "get_entitlements", "args": {}})
 
 
 def _policy_reply(message: str) -> str:

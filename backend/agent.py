@@ -481,8 +481,8 @@ def _route_llm(message: str, session: SessionState, query: dict | None = None) -
                 # Explicit live-data queries must retrieve records this turn,
                 # regardless of stale answers present in conversation history.
                 options["tool_choice"] = {"type": "function", "function": {"name": query["name"]}}
-            elif query:
-                options["tool_choice"] = "none"
+            # Later rounds omit tool_choice: Bedrock-backed models reject
+            # tool_choice="none". Extra tool calls are handled below instead.
             resp = client.chat.completions.create(
                 model=config.ICA_MODEL, messages=messages,
                 tools=[t for t in _tool_schema() if not query or t["function"]["name"] == query["name"]],
@@ -512,6 +512,12 @@ def _route_llm(message: str, session: SessionState, query: dict | None = None) -
         }, dur)
         # Also log the distilled intent (reasoning + chosen tools).
         log_intent("llm_reasoning", {"content": choice.content or "", "tool_calls": tool_calls})
+        if query and round_index > 0 and choice.tool_calls:
+            # Explicit queries get exactly one tool round; ignore further calls
+            # and answer from the authoritative result already retrieved.
+            final_reply = choice.content or _query_reply(query)
+            messages.append({"role": "assistant", "content": final_reply})
+            break
         if not choice.tool_calls:
             final_reply = choice.content or ""
             if query and query["name"] not in session.turn_tools:

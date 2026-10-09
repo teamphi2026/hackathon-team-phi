@@ -32,11 +32,58 @@ class StorageError(RuntimeError):
     """Safe-to-display storage error; never contains credentials or raw HTTP bodies."""
 
 
+# Required columns per table. Defined in code so Sheets mode never needs the
+# local hr_data/ folder. Worksheets may carry extra columns; these must exist.
+SCHEMAS: dict[str, list[str]] = {
+    "02_Job_Information.csv": [
+        "user_id", "full_name", "email", "home_team_id", "job_title", "manager_id", "join_date",
+        "years_of_service", "employment_status", "annual_leave_entitlement", "all_teams", "team_count",
+        "time_profile_code", "work_schedule_code", "holiday_calendar_code", "mobile", "gender",
+        "citizenship_status", "marital_status", "employer", "project_id"],
+    "03_Teams.csv": ["team_id", "team_name", "head_employee_id", "headcount", "min_staff_on_duty", "notes"],
+    "04_Team_Members.csv": ["membership_id", "user_id", "team_id", "is_primary", "role_in_team"],
+    "05_Time_Type.csv": [
+        "time_type_code", "time_type_name", "time_unit", "time_account_type_code", "requires_approval",
+        "requires_medical_cert", "duration_display", "notes"],
+    "06_Time_Account_Type.csv": [
+        "time_account_type_code", "time_account_type_name", "account_creation_type", "entitlement_method",
+        "accrual_rule_code", "annual_quota_days", "account_valid_from", "account_valid_until",
+        "carry_over_allowed", "expiry_rule", "notes"],
+    "08_Time_Profile.csv": [
+        "time_profile_code", "time_type_code", "available_to_employee", "favorite", "main_absence_time_type"],
+    "09_Work_Schedule.csv": [
+        "work_schedule_code", "work_schedule_name", "mon_hours", "tue_hours", "wed_hours", "thu_hours",
+        "fri_hours", "sat_hours", "sun_hours", "weekend_mask"],
+    "10_Holiday_Calendar.csv": [
+        "date", "holiday_name", "day_of_week", "is_in_lieu", "notes", "holiday_calendar_code"],
+    "11_Time_Account.csv": [
+        "time_account_id", "user_id", "time_account_type_code", "account_valid_from", "account_valid_until",
+        "account_closed", "balance_today", "planned_bookings", "pending_requests", "available",
+        "projected_year_end"],
+    "12_Time_Account_Detail.csv": [
+        "detail_id", "time_account_id", "booking_date", "posting_type", "booking_amount", "booking_unit",
+        "employee_time_id", "comment", "expiry_date", "consumes_detail_id", "remaining_credit",
+        "credit_status"],
+    "13_Employee_Time.csv": [
+        "employee_time_id", "user_id", "time_type_code", "start_date", "end_date", "half_day",
+        "quantity_in_days", "reason", "approval_status", "approver_id", "submitted_at", "decided_at",
+        "decision_note"],
+    "17_Dependents.csv": ["dependent_id", "user_id", "name", "date_of_birth", "relationship"],
+    "18_Entitlement_Rules.csv": [
+        "rule_id", "time_type_code", "condition_field", "condition_operator", "condition_value",
+        "annual_quota_days", "notes"],
+    "19_Project_Events.csv": ["event_id", "project_id", "event_type", "start_date", "end_date", "description"],
+    "20_Companies.csv": ["company_id", "company_name", "contract_hr_email", "time_profile_code", "policy_file"],
+    "21_Users.csv": ["username", "salt", "password_hash", "user_id", "display_name"],
+    TOKEN_FILE: TOKEN_HEADER,
+}
+
+
 def schema(name: str) -> list[str]:
-    if name == TOKEN_FILE:
-        return list(TOKEN_HEADER)
-    with open(config.data_file(name), newline="", encoding="utf-8") as fh:
-        return next(csv.reader(fh))
+    try:
+        return list(SCHEMAS[name])
+    except KeyError:
+        raise StorageError(f"Unknown storage table: {name}") from None
 
 
 class CsvStore:

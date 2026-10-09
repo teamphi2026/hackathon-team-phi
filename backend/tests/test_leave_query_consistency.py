@@ -201,7 +201,7 @@ def test_llm_uses_live_scoped_tool_despite_stale_conversation(data, monkeypatch,
                 assert {t["function"]["name"] for t in kwargs["tools"]} == {tool}
                 # Simulate the original wrong tool selection / identity injection.
                 return _Resp(_Msg(tool_calls=[_ToolCall("get_request_status", '{"employee_id":"E001"}')]), "tool_calls")
-            assert kwargs["tool_choice"] == "none"
+            assert "tool_choice" not in kwargs
             result = json.loads(kwargs["messages"][-1]["content"])
             rows = result["pending_requests"] if tool == "get_entitlements" else result["requests"]
             assert {r["reference_id"] for r in rows} == expected_refs

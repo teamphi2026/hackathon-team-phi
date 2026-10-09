@@ -5,4 +5,6 @@
 // PRODUCTION: set it to the public URL of the deployed backend (no trailing slash),
 //             e.g. 'https://leave-agent-api.onrender.com'. Without it, a deployed
 //             site has no API to call and sign-in will report that it can't reach one.
-window.LEAVE_API_BASE = 'https://leave-agent-api-w661.onrender.com';
+window.LEAVE_API_BASE = ['localhost', '127.0.0.1', ''].includes(window.location.hostname)
+  ? ''  // local dev: pages fall back to http://localhost:8000
+  : 'https://leave-agent-api-w661.onrender.com';

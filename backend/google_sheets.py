@@ -24,6 +24,9 @@ NUMERIC_COLUMNS = {"quantity_in_days", "booking_amount", "remaining_credit", "ba
                    "planned_bookings", "pending_requests", "available", "projected_year_end",
                    "headcount", "min_staff_on_duty", "years_of_service", "annual_leave_entitlement"}
 EPOCH = date(1899, 12, 30)
+# Read-only reference tables whose "date" columns may hold descriptive text
+# (e.g. "On purchase"). Numeric serials are still converted to YYYY-MM-DD.
+FREE_TEXT_DATE_TABLES = {"06_Time_Account_Type.csv"}
 
 
 def _normal(name: str) -> str:
@@ -157,7 +160,8 @@ class SheetsStore:
                 row = {h: _text(cells[i] if i < len(cells) else "", h) for i, h in enumerate(header)}
                 if any(v.startswith(("#REF!", "#VALUE!", "#ERROR!", "#DIV/0!", "#N/A")) for v in row.values()):
                     raise StorageError(f"Worksheet {prop['title']} contains a spreadsheet formula error.")
-                for column in DATE_COLUMNS - {"join_date"}:
+                strict_dates = set() if name in FREE_TEXT_DATE_TABLES else DATE_COLUMNS - {"join_date"}
+                for column in strict_dates:
                     if row.get(column):
                         try:
                             date.fromisoformat(row[column])
@@ -212,7 +216,8 @@ class SheetsStore:
             title = self.tab_map.get(name, Path(name).stem)
             header = schema(name)
             rows = []
-            if name != TOKEN_FILE:
+            # Seed rows from a local CSV only if one exists; otherwise create a header-only tab.
+            if name != TOKEN_FILE and config.data_file(name).exists():
                 with open(config.data_file(name), newline="", encoding="utf-8") as fh:
                     rows = list(csv.DictReader(fh))
             values = [{"values": [{"userEnteredValue": {"stringValue": h}} for h in header]}]
